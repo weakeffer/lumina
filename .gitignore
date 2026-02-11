@@ -1,4 +1,4 @@
-# Django
+# === DJANGO ===
 *.pyc
 __pycache__/
 *.pyo
@@ -7,17 +7,34 @@ __pycache__/
 db.sqlite3
 migrations/
 
-# Virtual Environment
+# === REACT ===
+node_modules/
+build/
+dist/
+*.js.map
+*.css.map
+.eslintcache
+
+# === Package Managers ===
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# === Environment ===
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# === Virtual Environment ===
 venv/
 env/
 ENV/
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.venv/
+.python-version
 
-# IDE
+# === IDE ===
 .vscode/
 .idea/
 *.swp
@@ -26,22 +43,20 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Python
-*.egg-info/
-dist/
-build/
+# === Testing ===
 .coverage
 htmlcov/
 .pytest_cache/
-.python-version
+coverage/
+.nyc_output/
 
-# Logs
+# === Logs ===
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# OS
+# === OS ===
 .DS_Store
 .DS_Store?
 ._*
@@ -50,11 +65,11 @@ yarn-error.log*
 ehthumbs.db
 [Tt]humbs.db
 
-# PostgreSQL
+# === Database ===
 *.pid
 *.postgres
 postgres_data/
 
-# Project specific
+# === Project specific ===
 /media/
 /staticfiles/
