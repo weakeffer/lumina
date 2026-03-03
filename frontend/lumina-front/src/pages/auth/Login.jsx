@@ -1,31 +1,34 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import AuthLayout from './AuthLayout';
 import Input from '../../components/ui/Input';
+import { api } from '../../api/api';
 
 const Login = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: ''
   });
+
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [serverError, setServerError] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
 
   const validateForm = () => {
     const newErrors = {};
     
-    if (!formData.email) {
-      newErrors.email = 'Email обязателен';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Введите корректный email';
+    if (!formData.username.trim()) {
+      newErrors.username = 'Имя пользователя или email обязательны';
     }
     
     if (!formData.password) {
       newErrors.password = 'Пароль обязателен';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Пароль должен содержать минимум 6 символов';
     }
     
     setErrors(newErrors);
@@ -34,33 +37,63 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+    setServerError('');
     if (!validateForm()) return;
-    
     setIsLoading(true);
     
-    // Имитация запроса к API
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      console.log('Вход:', formData, 'Запомнить:', rememberMe);
+      console.log('Attempting login with:', formData);
+
+      const response = await api.login({
+        username: formData.username,
+        password: formData.password
+      });
+      
+      console.log('Login successful:', response);
+
+      localStorage.setItem('token', response.token);
+
+      localStorage.setItem('user', JSON.stringify({
+        id: response.user_id,
+        username: response.username,
+        email: response.email,
+        last_login: response.last_login
+      }));
+
+      console.log('User data saved, redirecting...');
+
       navigate('/notes');
+      
     } catch (error) {
-      console.error('Ошибка входа:', error);
+      console.error('Login error in component:', error);
+
+      if (error.message) {
+        setServerError(error.message);
+      } else {
+        setServerError('Произошла неизвестная ошибка. Попробуйте позже.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-    if (errors[e.target.name]) {
-      setErrors({
-        ...errors,
-        [e.target.name]: ''
-      });
+    const { name, value } = e.target;
+
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+
+    if (serverError) {
+      setServerError('');
     }
   };
 
@@ -70,15 +103,29 @@ const Login = () => {
       subtitle="Войдите в свой аккаунт"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
+
+        {serverError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3">
+            <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-red-600">{serverError}</p>
+              <p className="text-xs text-red-500 mt-1">
+                Проверьте правильность введенных данных
+              </p>
+            </div>
+          </div>
+        )}
+
         <Input
-          label="Email"
-          type="email"
-          name="email"
-          placeholder="example@mail.com"
+          label="Имя пользователя или Email"
+          type="text"
+          name="username"
+          placeholder="username или email@example.com"
           icon={Mail}
-          value={formData.email}
+          value={formData.username}
           onChange={handleChange}
-          error={errors.email}
+          error={errors.username}
+          disabled={isLoading}
         />
 
         <div className="relative">
@@ -91,11 +138,13 @@ const Login = () => {
             value={formData.password}
             onChange={handleChange}
             error={errors.password}
+            disabled={isLoading}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+            disabled={isLoading}
           >
             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
@@ -109,6 +158,7 @@ const Login = () => {
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
               className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              disabled={isLoading}
             />
             <label htmlFor="remember" className="ml-2 text-sm text-gray-600">
               Запомнить меня
@@ -127,7 +177,7 @@ const Login = () => {
           type="submit"
           disabled={isLoading}
           className={`
-            w-full py-3 px-4 bg-gradient-to-r from-indigo-600 to-purple-600
+            w-full py-3 px-4 bg-linear-to-r from-indigo-600 to-purple-600
             text-white font-semibold rounded-xl
             hover:from-indigo-700 hover:to-purple-700
             focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
@@ -162,6 +212,7 @@ const Login = () => {
             focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2
             transform transition-all duration-200 ease-in-out
             flex items-center justify-center space-x-2"
+          disabled={isLoading}
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path

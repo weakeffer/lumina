@@ -6,6 +6,11 @@ const Input = ({
   icon: Icon, 
   error, 
   className = '',
+  value,
+  onChange,
+  name,
+  placeholder,
+  disabled,
   ...props 
 }) => {
   return (
@@ -23,12 +28,18 @@ const Input = ({
         )}
         <input
           type={type}
+          name={name}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          disabled={disabled}
           className={`
             w-full px-4 py-3 ${Icon ? 'pl-10' : ''}
             bg-gray-50 border border-gray-200 rounded-xl
             focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
             transition-all duration-200 ease-in-out
             ${error ? 'border-red-500 focus:ring-red-500' : ''}
+            ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
             ${className}
           `}
           {...props}

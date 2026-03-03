@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { api } from '../../api/api';
 import AuthLayout from './AuthLayout';
 import Input from '../../components/ui/Input';
 
@@ -9,19 +10,20 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
+    username: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    password2: ''
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [serverError, setServerError] = useState('');
 
   const validateForm = () => {
     const newErrors = {};
     
-    if (!formData.name.trim()) {
-      newErrors.name = 'Имя обязательно';
+    if (!formData.username.trim()) {
+      newErrors.username = 'Имя пользователя обязательно';
     }
     
     if (!formData.email) {
@@ -36,8 +38,8 @@ const Register = () => {
       newErrors.password = 'Пароль должен содержать минимум 6 символов';
     }
     
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Пароли не совпадают';
+    if (formData.password !== formData.password2) {
+      newErrors.password2 = 'Пароли не совпадают';
     }
     
     setErrors(newErrors);
@@ -46,33 +48,42 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setServerError('');
     
     if (!validateForm()) return;
     
     setIsLoading(true);
     
-    // Имитация запроса к API
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      console.log('Регистрация:', formData);
+      const response = await api.register({
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        password2: formData.password2
+      });
+      
+      localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
       navigate('/notes');
     } catch (error) {
-      console.error('Ошибка регистрации:', error);
+      setServerError(error.message || 'Ошибка при регистрации');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-    if (errors[e.target.name]) {
-      setErrors({
-        ...errors,
-        [e.target.name]: ''
-      });
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
     }
   };
 
@@ -98,15 +109,22 @@ const Register = () => {
       subtitle="Начните создавать свои заметки уже сегодня"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        {serverError && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+            {serverError}
+          </div>
+        )}
+
         <Input
-          label="Имя"
+          label="Имя пользователя"
           type="text"
-          name="name"
-          placeholder="Введите ваше имя"
+          name="username"
+          placeholder="Введите имя пользователя"
           icon={User}
-          value={formData.name}
+          value={formData.username}
           onChange={handleChange}
-          error={errors.name}
+          error={errors.username}
+          disabled={isLoading}
         />
 
         <Input
@@ -118,6 +136,7 @@ const Register = () => {
           value={formData.email}
           onChange={handleChange}
           error={errors.email}
+          disabled={isLoading}
         />
 
         <div className="relative">
@@ -130,11 +149,13 @@ const Register = () => {
             value={formData.password}
             onChange={handleChange}
             error={errors.password}
+            disabled={isLoading}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+            disabled={isLoading}
           >
             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
@@ -162,17 +183,19 @@ const Register = () => {
           <Input
             label="Подтверждение пароля"
             type={showConfirmPassword ? 'text' : 'password'}
-            name="confirmPassword"
+            name="password2"
             placeholder="Повторите пароль"
             icon={CheckCircle}
-            value={formData.confirmPassword}
+            value={formData.password2}
             onChange={handleChange}
-            error={errors.confirmPassword}
+            error={errors.password2}
+            disabled={isLoading}
           />
           <button
             type="button"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
             className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+            disabled={isLoading}
           >
             {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
@@ -184,6 +207,7 @@ const Register = () => {
             id="terms"
             className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
             required
+            disabled={isLoading}
           />
           <label htmlFor="terms" className="ml-2 text-sm text-gray-600">
             Я принимаю{' '}
@@ -200,19 +224,16 @@ const Register = () => {
         <button
           type="submit"
           disabled={isLoading}
-          className={`
-            w-full py-3 px-4 bg-gradient-to-r from-indigo-600 to-purple-600
-            text-white font-semibold rounded-xl
-            hover:from-indigo-700 hover:to-purple-700
+          className="w-full py-3 px-4 bg-linear-to-r from-indigo-600 to-purple-600
+            text-white font-semibold rounded-xl hover:from-indigo-700 hover:to-purple-700
             focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
+            disabled:opacity-50 disabled:cursor-not-allowed
             transform transition-all duration-200 ease-in-out
-            hover:scale-[1.02] active:scale-[0.98]
-            ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}
-          `}
+            hover:scale-[1.02] active:scale-[0.98]"
         >
           {isLoading ? (
             <div className="flex items-center justify-center">
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
               Создание аккаунта...
             </div>
           ) : (
@@ -222,7 +243,7 @@ const Register = () => {
 
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-200"></div>
+            <div className="w-full border-t border-gray-200" />
           </div>
           <div className="relative flex justify-center text-sm">
             <span className="px-2 bg-white/80 text-gray-500">или</span>
@@ -236,6 +257,7 @@ const Register = () => {
             focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2
             transform transition-all duration-200 ease-in-out
             flex items-center justify-center space-x-2"
+          disabled={isLoading}
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path
