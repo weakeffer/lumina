@@ -1,71 +1,70 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './pages/notes/ThemeContext';
 import { SettingsProvider } from './pages/notes/SettingsContext';
+
+// Импортируем старые страницы (пока оставляем)
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
-import Notes from './pages/notes/Notes';
-import Profile from './pages/notes/Profile';
-import './index.css'; 
+import AuthLayout from './pages/auth/AuthLayout';
 
+// Импортируем новую страницу заметок
+import NotesPage from './features/notes/components/NotesPage/NotesPage';
+import ProfilePage from './features/notes/components/Profile/ProfilePage';
+
+// Компонент для защиты маршрутов
 const PrivateRoute = ({ children }) => {
-    const token = localStorage.getItem('token');
-    return token ? children : <Navigate to="/login" replace />;
-};
-
-const PublicRoute = ({ children }) => {
-    const token = localStorage.getItem('token');
-    return token ? <Navigate to="/notes" replace /> : children;
+  const token = localStorage.getItem('token');
+  return token ? children : <Navigate to="/login" />;
 };
 
 function App() {
-    return (
-        <ThemeProvider>
-            <SettingsProvider>
-                <Router>
-                    <Routes>
-                        <Route path="/login" element={
-                            <PublicRoute>
-                                <Login />
-                            </PublicRoute>
-                        } />
-                        
-                        <Route path="/register" element={
-                            <PublicRoute>
-                                <Register />
-                            </PublicRoute>
-                        } />
-                        
-                        <Route path="/notes" element={
-                            <PrivateRoute>
-                                <Notes />
-                            </PrivateRoute>
-                        } />
-                        
-                        <Route path="/profile" element={
-                            <PrivateRoute>
-                                <Profile />
-                            </PrivateRoute>
-                        } />
+  return (
+    <ThemeProvider>
+      <SettingsProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Auth routes */}
+            <Route element={<AuthLayout />}>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+            </Route>
 
-                        <Route path="/notes/:id" element={
-                            <PrivateRoute>
-                                <Notes />
-                            </PrivateRoute>
-                        } />
-                        
-                        <Route path="/" element={
-                            <Navigate to="/notes" replace />
-                        } />
-                        
-                        <Route path="*" element={
-                            <Navigate to="/notes" replace />
-                        } />
-                    </Routes>
-                </Router>
-            </SettingsProvider>
-        </ThemeProvider>
-    );
+            {/* Protected routes - используем новую страницу */}
+            <Route
+              path="/"
+              element={
+                <PrivateRoute>
+                  <NotesPage />
+                </PrivateRoute>
+              }
+            />
+            
+            <Route
+              path="/note/:id"
+              element={
+                <PrivateRoute>
+                  <NotesPage />
+                </PrivateRoute>
+              }
+            />
+            
+            <Route
+              path="/profile"
+              element={
+                <PrivateRoute>
+                  <ProfilePage />
+                </PrivateRoute>
+              }
+            />
+
+            {/* Redirect to notes if route not found */}
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </BrowserRouter>
+      </SettingsProvider>
+    </ThemeProvider>
+  );
 }
 
 export default App;
