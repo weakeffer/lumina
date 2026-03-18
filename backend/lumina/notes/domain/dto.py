@@ -1,4 +1,3 @@
-# backend/lumina/notes/domain/dto.py
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -7,7 +6,6 @@ from .entities import NoteEntity, NoteGroupEntity
 
 @dataclass
 class NoteResponseDTO:
-    """DTO для ответа с данными заметки"""
     id: int
     title: str
     text: str
@@ -24,7 +22,6 @@ class NoteResponseDTO:
     @classmethod
     def from_entity(cls, note: NoteEntity, group_name: Optional[str] = None, 
                     group_color: Optional[str] = None) -> 'NoteResponseDTO':
-        """Создание DTO из сущности"""
         moscow_tz = pytz.timezone('Europe/Moscow')
         
         created_at = None
@@ -68,7 +65,6 @@ class NoteResponseDTO:
 
 @dataclass
 class NoteListDTO:
-    """DTO для списка заметок"""
     id: int
     title: str
     preview: str
@@ -86,12 +82,9 @@ class NoteListDTO:
     @classmethod
     def from_entity(cls, note: NoteEntity, group_name: Optional[str] = None,
                     group_color: Optional[str] = None) -> 'NoteListDTO':
-        """Создание DTO из сущности"""
         preview = note.text[:100] + '...' if len(note.text) > 100 else note.text
         
         moscow_tz = pytz.timezone('Europe/Moscow')
-        
-        # Форматирование дат для отображения
         created_at_formatted = None
         if note.created_at:
             if isinstance(note.created_at, datetime):
@@ -129,7 +122,6 @@ class NoteListDTO:
 
 @dataclass
 class NoteDetailDTO:
-    """DTO для детальной информации о заметке"""
     id: int
     title: str
     text: str
@@ -142,13 +134,10 @@ class NoteDetailDTO:
     
     @classmethod
     def from_entity(cls, note: NoteEntity) -> 'NoteDetailDTO':
-        """Создание DTO из сущности"""
-        # Форматирование дат для отображения
         created_at_formatted = note.created_at.strftime('%d.%m.%Y %H:%M') if note.created_at else None
         updated_at_formatted = note.updated_at.strftime('%d.%m.%Y %H:%M') if note.updated_at else None
         deleted_at_formatted = note.deleted_at.strftime('%d.%m.%Y %H:%M') if note.deleted_at else None
-        
-        # Форматирование изображений
+
         images_with_details = []
         for idx, img in enumerate(note.images):
             image_data = {
@@ -174,7 +163,6 @@ class NoteDetailDTO:
 
 @dataclass
 class DeletedNoteDTO:
-    """DTO для удаленных заметок"""
     id: int
     title: str
     text: str
@@ -185,7 +173,6 @@ class DeletedNoteDTO:
     
     @classmethod
     def from_entity(cls, note: NoteEntity) -> 'DeletedNoteDTO':
-        """Создание DTO из сущности"""
         created_at_formatted = note.created_at.strftime('%d.%m.%Y %H:%M') if note.created_at else None
         deleted_at_formatted = note.deleted_at.strftime('%d.%m.%Y %H:%M') if note.deleted_at else None
         
@@ -201,7 +188,6 @@ class DeletedNoteDTO:
 
 @dataclass
 class NoteStatisticsDTO:
-    """DTO для статистики заметок"""
     total_notes: int
     last_created: str
     deleted_count: int
@@ -210,7 +196,6 @@ class NoteStatisticsDTO:
     @classmethod
     def from_data(cls, total_notes: int, last_created: datetime, 
                   deleted_count: int, total_images: int) -> 'NoteStatisticsDTO':
-        """Создание DTO из данных"""
         return cls(
             total_notes=total_notes,
             last_created=last_created.strftime('%d.%m.%Y %H:%M') if last_created else None,
@@ -220,7 +205,6 @@ class NoteStatisticsDTO:
 
 @dataclass
 class GroupResponseDTO:
-    """DTO для ответа с данными группы"""
     id: int
     name: str
     description: str
@@ -233,7 +217,6 @@ class GroupResponseDTO:
     
     @classmethod
     def from_entity(cls, group: NoteGroupEntity, notes_count: int = 0) -> 'GroupResponseDTO':
-        """Создание DTO из сущности"""
         return cls(
             id=group.id,
             name=group.name,
@@ -248,14 +231,12 @@ class GroupResponseDTO:
 
 @dataclass
 class CreateNoteDTO:
-    """DTO для создания заметки"""
     title: str
     text: str
     group_id: Optional[int] = None
     
     @classmethod
     def from_request(cls, data: Dict[str, Any]) -> 'CreateNoteDTO':
-        """Создание DTO из данных запроса"""
         return cls(
             title=data.get('title', 'Заметка'),
             text=data.get('text', ''),
@@ -264,7 +245,6 @@ class CreateNoteDTO:
 
 @dataclass
 class UpdateNoteDTO:
-    """DTO для обновления заметки"""
     title: Optional[str] = None
     text: Optional[str] = None
     images: Optional[List[Dict[str, Any]]] = None
@@ -272,7 +252,6 @@ class UpdateNoteDTO:
     
     @classmethod
     def from_request(cls, data: Dict[str, Any]) -> 'UpdateNoteDTO':
-        """Создание DTO из данных запроса"""
         return cls(
             title=data.get('title'),
             text=data.get('text'),
@@ -282,7 +261,6 @@ class UpdateNoteDTO:
 
 @dataclass
 class CreateGroupDTO:
-    """DTO для создания группы"""
     name: str
     description: str = ""
     color: str = 'indigo'
@@ -290,7 +268,6 @@ class CreateGroupDTO:
     
     @classmethod
     def from_request(cls, data: Dict[str, Any]) -> 'CreateGroupDTO':
-        """Создание DTO из данных запроса"""
         return cls(
             name=data.get('name', '').strip(),
             description=data.get('description', ''),
@@ -299,7 +276,6 @@ class CreateGroupDTO:
         )
     
     def validate(self) -> List[str]:
-        """Валидация DTO"""
         errors = []
         if not self.name:
             errors.append("Название группы не может быть пустым")
@@ -309,7 +285,6 @@ class CreateGroupDTO:
 
 @dataclass
 class UpdateGroupDTO:
-    """DTO для обновления группы"""
     name: Optional[str] = None
     description: Optional[str] = None
     color: Optional[str] = None
@@ -317,7 +292,6 @@ class UpdateGroupDTO:
     
     @classmethod
     def from_request(cls, data: Dict[str, Any]) -> 'UpdateGroupDTO':
-        """Создание DTO из данных запроса"""
         return cls(
             name=data.get('name'),
             description=data.get('description'),
@@ -327,14 +301,12 @@ class UpdateGroupDTO:
 
 @dataclass
 class ImageUploadDTO:
-    """DTO для загрузки изображения"""
     image_url: Optional[str] = None
     image_data: Optional[str] = None
     filename: Optional[str] = None
     
     @classmethod
     def from_request(cls, data: Dict[str, Any]) -> 'ImageUploadDTO':
-        """Создание DTO из данных запроса"""
         return cls(
             image_url=data.get('image_url'),
             image_data=data.get('image_data'),
@@ -342,7 +314,6 @@ class ImageUploadDTO:
         )
     
     def validate(self) -> List[str]:
-        """Валидация DTO"""
         errors = []
         if not self.image_url and not self.image_data:
             errors.append("Необходимо указать image_url или image_data")

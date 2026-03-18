@@ -10,7 +10,6 @@ class ServiceFactory:
     
     @classmethod
     def get_note_service(cls) -> NoteService:
-        """Получить экземпляр сервиса заметок"""
         if cls._note_service is None:
             note_repo = DjangoNoteRepository()
             group_repo = DjangoNoteGroupRepository()
@@ -19,7 +18,6 @@ class ServiceFactory:
     
     @classmethod
     def get_group_service(cls) -> NoteGroupService:
-        """Получить экземпляр сервиса групп"""
         if cls._group_service is None:
             note_repo = DjangoNoteRepository()
             group_repo = DjangoNoteGroupRepository()
@@ -28,6 +26,5 @@ class ServiceFactory:
     
     @classmethod
     def clear(cls):
-        """Очистить кэш сервисов (для тестов)"""
         cls._note_service = None
         cls._group_service = None

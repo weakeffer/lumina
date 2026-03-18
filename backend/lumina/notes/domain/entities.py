@@ -1,4 +1,3 @@
-# backend/lumina/notes/domain/entities.py
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -25,7 +24,6 @@ class GroupIcon(str, Enum):
 
 @dataclass
 class NoteGroupEntity:
-    """Чистая доменная сущность группы заметок"""
     name: str
     user_id: int
     id: Optional[int] = None
@@ -48,7 +46,6 @@ class NoteGroupEntity:
 
     def update(self, name: str = None, description: str = None, 
                color: str = None, icon: str = None):
-        """Обновление данных группы"""
         if name is not None:
             self.name = name
         if description is not None:
@@ -62,7 +59,6 @@ class NoteGroupEntity:
 
 @dataclass
 class NoteEntity:
-    """Чистая доменная сущность заметки"""
     title: str
     text: str
     user_id: int
@@ -88,7 +84,6 @@ class NoteEntity:
             raise ValueError("Заметка должна быть привязана к пользователю")
 
     def update_content(self, title: str = None, text: str = None):
-        """Обновление содержимого заметки"""
         if title is not None:
             self.title = title
         if text is not None:
@@ -97,25 +92,21 @@ class NoteEntity:
         self.updated_at = datetime.now()
 
     def move_to_group(self, group_id: Optional[int]):
-        """Перемещение заметки в группу"""
         self.group_id = group_id
         self.updated_at = datetime.now()
 
     def delete(self):
-        """Мягкое удаление заметки"""
         self.is_deleted = True
         self.deleted_at = datetime.now()
         self.updated_at = datetime.now()
 
     def restore(self):
-        """Восстановление заметки"""
         self.is_deleted = False
         self.deleted_at = None
         self.updated_at = datetime.now()
 
     def add_image(self, image_url: str, image_id: Optional[str] = None, 
                   filename: Optional[str] = None) -> Dict[str, Any]:
-        """Добавление изображения"""
         image_data = {
             'url': image_url,
             'added_at': len(self.images)
@@ -131,7 +122,6 @@ class NoteEntity:
         return image_data
 
     def remove_image(self, image_url_or_id: str) -> bool:
-        """Удаление изображения"""
         original_count = len(self.images)
         
         if isinstance(image_url_or_id, (int, str)) and str(image_url_or_id).isdigit():
@@ -146,15 +136,12 @@ class NoteEntity:
         return False
 
     def get_images(self) -> List[Dict[str, Any]]:
-        """Получение списка изображений"""
         return self.images.copy()
 
     def has_images(self) -> bool:
-        """Проверка наличия изображений"""
         return bool(self.images)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Конвертация в словарь"""
         return {
             'id': self.id,
             'title': self.title,

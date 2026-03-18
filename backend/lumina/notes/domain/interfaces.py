@@ -1,4 +1,3 @@
-# backend/lumina/notes/domain/interfaces.py
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
 from datetime import datetime
