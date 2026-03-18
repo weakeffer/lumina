@@ -13,6 +13,7 @@ export const QUERY_KEYS = {
     all: ['groups'],
     lists: () => [...QUERY_KEYS.groups.all, 'list'],
     list: (filters) => [...QUERY_KEYS.groups.lists(), { filters }],
+    withNotes: ['groups', 'withNotes'], // ДОБАВЛЕНО
   },
   tags: {
     all: ['tags'],

@@ -14,7 +14,7 @@ import MiniStatistics from '../../../../pages/notes/MiniStatistics';
 import DeleteConfirmModal from '../../../../pages/notes/DeleteConfirmModal';
 import { useNotes, useTrashNotes, useNotesByGroups } from '../../hooks/useNotes';
 import { useNoteMutations } from '../../hooks/useNoteMutations';
-import { useGroups } from '../../hooks/useGroups';
+import { useGroupsWithNotes, useGroupMutations } from '../../hooks/useGroups';
 import { useTags } from '../../hooks/useTags';
 import { useNoteUI } from '../../hooks/useNoteUI';
 import { useNoteFilters } from '../../hooks/useNoteFilters';
@@ -27,11 +27,15 @@ const NotesPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { themeClasses, isMobile, theme, setTheme } = useTheme();
+  
+  // Данные
   const { data: notes = [], isLoading: notesLoading } = useNotes();
-  const { data: groups = [] } = useGroups();
+  const { data: groupsWithNotes = [] } = useGroupsWithNotes();
   const { data: tags = [] } = useTags();
   const { data: trashNotes = [] } = useTrashNotes();
   const { data: notesByGroups } = useNotesByGroups();
+  
+  // Мутации
   const {
     createNote,
     updateNote,
@@ -39,6 +43,14 @@ const NotesPage = () => {
     restoreNote,
     moveNoteToGroup,
   } = useNoteMutations();
+  
+  const {
+    createGroup,
+    updateGroup,
+    deleteGroup,
+  } = useGroupMutations();
+
+  // UI состояние
   const {
     uiState,
     openNoteModal,
@@ -65,7 +77,10 @@ const NotesPage = () => {
     showNotification,
     setSelectedGroup,
     setOnlineStatus,
+    updateUI,
   } = useNoteUI();
+
+  // Фильтры
   const {
     filters,
     updateFilter,
@@ -75,6 +90,7 @@ const NotesPage = () => {
     filterAndSortNotes,
   } = useNoteFilters();
 
+  // Отслеживание онлайн статуса
   useEffect(() => {
     const handleOnline = () => setOnlineStatus(true);
     const handleOffline = () => setOnlineStatus(false);
@@ -88,6 +104,7 @@ const NotesPage = () => {
     };
   }, [setOnlineStatus]);
 
+  // Открытие заметки по URL
   useEffect(() => {
     if (id && notes.length > 0) {
       const note = notes.find(n => n.id === parseInt(id));
@@ -97,16 +114,48 @@ const NotesPage = () => {
     }
   }, [id, notes, uiState.selectedNoteId, openNoteModal]);
 
+  // Фильтрация заметок
   const filteredNotes = useMemo(() => 
     filterAndSortNotes(notes),
     [notes, filterAndSortNotes]
   );
 
+  // Выбранная заметка
   const selectedNote = useMemo(() => 
     notes.find(n => n.id === uiState.selectedNoteId),
     [notes, uiState.selectedNoteId]
   );
 
+  // Группировка заметок для сайдбара
+  const groupedNotesForSidebar = useMemo(() => {
+    const result = {};
+    
+    result["Все заметки"] = [...notes].sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    );
+    
+    result["Избранное"] = notes.filter(n => n.isFavorite);
+    
+    // Группируем по ID групп для надежности
+    groupsWithNotes.forEach(group => {
+      if (group.id !== 'none' && group.name) {
+        // По названию
+        result[group.name] = notes.filter(
+          note => String(note.group) === String(group.id) || note.group_id === group.id
+        );
+        // По ID (для надежности)
+        result[`group_${group.id}`] = notes.filter(
+          note => String(note.group) === String(group.id) || note.group_id === group.id
+        );
+      }
+    });
+    
+    result["Без группы"] = notes.filter(note => !note.group && !note.group_id);
+    
+    return result;
+  }, [notes, groupsWithNotes]);
+
+  // Обработчики
   const handleNoteSelect = useCallback((note) => {
     openNoteModal(note.id, 'view');
     if (isMobile) closeMobileMenu();
@@ -192,6 +241,7 @@ const NotesPage = () => {
     }
   }, [restoreNote, showNotification]);
 
+  // Drag & Drop
   const handleDragStart = useCallback((e, note) => {
     setDraggedNote(note);
     e.dataTransfer.setData('text/plain', note.id);
@@ -204,10 +254,10 @@ const NotesPage = () => {
 
   const handleDragOver = useCallback((e, groupId) => {
     e.preventDefault();
-    if (groupId && groups.some(g => g.id === groupId)) {
+    if (groupId && groupsWithNotes.some(g => g.id === groupId)) {
       setDragOverGroup(groupId);
     }
-  }, [groups, setDragOverGroup]);
+  }, [groupsWithNotes, setDragOverGroup]);
 
   const handleDrop = useCallback(async (e, targetGroupId) => {
     e.preventDefault();
@@ -220,26 +270,35 @@ const NotesPage = () => {
     clearDragState();
   }, [handleMoveNote, clearDragState]);
 
-  const groupedNotesForSidebar = useMemo(() => {
-    const result = {};
-    
-    result["Все заметки"] = [...notes].sort(
-      (a, b) => new Date(b.created_at) - new Date(a.created_at)
-    );
-    
-    result["Избранное"] = notes.filter(n => n.isFavorite);
-    
-    groups.forEach(group => {
-      result[group.name] = notes.filter(
-        note => String(note.group) === String(group.id)
-      );
-    });
-    
-    result["Без группы"] = notes.filter(note => !note.group);
-    
-    return result;
-  }, [notes, groups]);
+  // Обработчики групп
+  const handleGroupCreate = useCallback(async (groupData) => {
+    try {
+      await createGroup.mutateAsync(groupData);
+      showNotification('Группа создана', 'success');
+    } catch (error) {
+      showNotification('Ошибка при создании группы', 'error');
+    }
+  }, [createGroup, showNotification]);
 
+  const handleGroupUpdate = useCallback(async (id, groupData) => {
+    try {
+      await updateGroup.mutateAsync({ id, ...groupData });
+      showNotification('Группа обновлена', 'success');
+    } catch (error) {
+      showNotification('Ошибка при обновлении группы', 'error');
+    }
+  }, [updateGroup, showNotification]);
+
+  const handleGroupDelete = useCallback(async (id) => {
+    try {
+      await deleteGroup.mutateAsync(id);
+      showNotification('Группа удалена', 'success');
+    } catch (error) {
+      showNotification('Ошибка при удалении группы', 'error');
+    }
+  }, [deleteGroup, showNotification]);
+
+  // Загрузка
   if (notesLoading && notes.length === 0) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -273,7 +332,7 @@ const NotesPage = () => {
             onMobileClose={closeMobileMenu}
             favorites={notes.filter(n => n.isFavorite).map(n => n.id)}
             tags={tags}
-            groups={groups}
+            groups={groupsWithNotes}
             selectedGroup={filters.selectedGroup}
             onGroupSelect={handleGroupSelect}
             onOpenGroupManager={toggleGroupManager}
@@ -297,7 +356,7 @@ const NotesPage = () => {
             searchQuery={filters.searchQuery}
             onSearchChange={(value) => updateFilter('searchQuery', value)}
             selectedGroup={filters.selectedGroup}
-            groups={groups}
+            groups={groupsWithNotes}
             onNoteCreate={handleNoteCreate}
             onToggleStatistics={toggleStatistics}
             onToggleFilters={toggleSearchFilters}
@@ -314,7 +373,7 @@ const NotesPage = () => {
           <Footer
             filteredNotesCount={filteredNotes.length}
             selectedGroup={filters.selectedGroup}
-            groups={groups}
+            groups={groupsWithNotes}
             selectedTags={filters.selectedTags}
             deletedNotesCount={trashNotes.length}
             onToggleTrash={toggleTrash}
@@ -327,7 +386,7 @@ const NotesPage = () => {
             notes={notes}
             tags={tags}
             favorites={notes.filter(n => n.isFavorite).map(n => n.id)}
-            groups={groups}
+            groups={groupsWithNotes}
             deletedCount={trashNotes.length}
             onClose={toggleStatistics}
           />
@@ -342,7 +401,7 @@ const NotesPage = () => {
             onUpdate={handleNoteUpdate}
             autoSave={true}
             fontSize="medium"
-            groups={groups}
+            groups={groupsWithNotes}
             onMoveToGroup={(groupId) => handleMoveNote(selectedNote.id, groupId)}
           />
         ) : (
@@ -351,7 +410,7 @@ const NotesPage = () => {
             notes={notes}
             recentNotes={filteredNotes.slice(0, 5)}
             selectedGroup={filters.selectedGroup}
-            groups={groups}
+            groups={groupsWithNotes}
           />
         )}
 
@@ -369,7 +428,7 @@ const NotesPage = () => {
             sortOrder={filters.sortOrder}
             setSortOrder={(value) => updateFilter('sortOrder', value)}
             tags={tags}
-            groups={groups}
+            groups={groupsWithNotes}
             selectedGroup={filters.selectedGroup}
             setSelectedGroup={(value) => updateFilter('selectedGroup', value)}
             onClose={toggleSearchFilters}
@@ -415,19 +474,14 @@ const NotesPage = () => {
           <GroupManager
             isOpen={uiState.isGroupManagerOpen}
             onClose={toggleGroupManager}
-            groups={groups}
+            groups={groupsWithNotes}
             notes={notes}
             onGroupSelect={handleGroupSelect}
             selectedGroupId={filters.selectedGroup}
-            onGroupCreated={(group) => {
-              showNotification('Группа создана', 'success');
-            }}
-            onGroupUpdated={(group) => {
-              showNotification('Группа обновлена', 'success');
-            }}
-            onGroupDeleted={(groupId) => {
-              showNotification('Группа удалена', 'success');
-            }}
+            onGroupCreate={handleGroupCreate}
+            onGroupUpdate={handleGroupUpdate}
+            onGroupDelete={handleGroupDelete}
+            onMoveNoteToGroup={handleMoveNote}
           />
         )}
 

@@ -1,7 +1,7 @@
 import { api } from '../../../api/api';
 
 export const groupsApi = {
-
+  // Получение всех групп (без заметок) - для администрирования групп
   getAll: async () => {
     try {
       const groups = await api.getGroups();
@@ -15,6 +15,22 @@ export const groupsApi = {
     }
   },
 
+  // Получение групп с заметками и количеством - для отображения в боковом меню
+  getAllWithNotes: async () => {
+    try {
+      // Используем эндпоинт /notes/by-groups/ из NotesViewSet
+      const groupsWithNotes = await api.getNotesByGroups();
+      return {
+        results: groupsWithNotes,
+        count: groupsWithNotes.length
+      };
+    } catch (error) {
+      console.error('groupsApi.getAllWithNotes error:', error);
+      throw error;
+    }
+  },
+
+  // Создание группы
   create: async (groupData) => {
     try {
       const newGroup = await api.createGroup(groupData);
@@ -25,6 +41,7 @@ export const groupsApi = {
     }
   },
 
+  // Обновление группы
   update: async ({ id, ...groupData }) => {
     try {
       const updatedGroup = await api.updateGroup(id, groupData);
@@ -35,6 +52,7 @@ export const groupsApi = {
     }
   },
 
+  // Удаление группы
   delete: async (id) => {
     try {
       await api.deleteGroup(id);
@@ -45,6 +63,7 @@ export const groupsApi = {
     }
   },
 
+  // Получение заметок группы
   getNotes: async (groupId) => {
     try {
       const notes = await api.getGroupNotes(groupId);
@@ -55,6 +74,7 @@ export const groupsApi = {
     }
   },
 
+  // Добавление заметок в группу
   addNotes: async (groupId, noteIds) => {
     try {
       const result = await api.addNotesToGroup(groupId, noteIds);
@@ -65,6 +85,7 @@ export const groupsApi = {
     }
   },
 
+  // Удаление заметок из группы
   removeNotes: async (groupId, noteIds) => {
     try {
       const result = await api.removeNotesFromGroup(groupId, noteIds);

@@ -195,7 +195,7 @@ export const api = {
                 group: noteData.group || null
             };
 
-            const response = await fetch(`${API_URL}/api/notes/create_note/`, {
+            const response = await fetch(`${API_URL}/api/notes/`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Token ${token}`,
@@ -207,6 +207,10 @@ export const api = {
             const data = await response.json();
 
             if (!response.ok) {
+                // Новая архитектура возвращает { errors: [...] }
+                if (data.errors) {
+                    throw new Error(data.errors.join(', '));
+                }
                 throw new Error(data.error || data.message || 'Ошибка создания заметки');
             }
 

@@ -68,6 +68,7 @@ export default function GroupManager({
 
   if (!isOpen) return null;
 
+  // Системные группы
   const systemGroups = [
     { id: "all", name: "Все заметки", icon: Grid, count: notes.length },
     { id: "favorites", name: "Избранное", icon: Star, count: notes.filter(n => n.isFavorite).length },
@@ -75,12 +76,21 @@ export default function GroupManager({
     { id: "images", name: "С изображениями", icon: ImageIcon, count: notes.filter(n => n.images_count > 0).length }
   ];
 
-  const getNotesForGroup = (id) => {
-    if (id === "all") return notes;
-    if (id === "favorites") return notes.filter(n => n.isFavorite);
-    if (id === "recent") return notes.slice(0, 5);
-    if (id === "images") return notes.filter(n => n.images_count > 0);
-    return notes.filter(n => n.group === id);
+  // ИСПРАВЛЕНО: Функция для получения заметок группы
+  const getNotesForGroup = (group) => {
+    // Если в группе уже есть поле notes (из /notes/by-groups/), используем его
+    if (group.notes && Array.isArray(group.notes)) {
+      return group.notes;
+    }
+    
+    // Иначе ищем по ID группы в общем списке заметок
+    if (group.id === "all") return notes;
+    if (group.id === "favorites") return notes.filter(n => n.isFavorite);
+    if (group.id === "recent") return notes.slice(0, 5);
+    if (group.id === "images") return notes.filter(n => n.images_count > 0);
+    
+    // Для обычных групп ищем по group_id
+    return notes.filter(n => n.group_id === group.id || n.group === group.id);
   };
 
   const getColor = (name) => colors.find(c => c.name === name)?.light || colors[0].light;
@@ -132,7 +142,6 @@ export default function GroupManager({
 
   return (
     <div className="fixed inset-0 z-50 flex">
-
       <div
         onClick={onClose}
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
@@ -144,9 +153,7 @@ export default function GroupManager({
         border-r ${themeClasses.colors.border.primary}
       `}>
         <div className="flex items-center justify-between p-4 border-b">
-
           <div className="flex items-center gap-3">
-
             <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
               <Folder className="w-5 h-5 text-indigo-600 dark:text-indigo-400"/>
             </div>
@@ -157,7 +164,6 @@ export default function GroupManager({
                 {groups.length} групп
               </p>
             </div>
-
           </div>
 
           <button
@@ -166,14 +172,12 @@ export default function GroupManager({
           >
             <Plus className="w-4 h-4"/>
           </button>
-
         </div>
 
-
         <div className="p-4 space-y-6">
+          {/* Форма создания/редактирования */}
           {showCreateForm && (
             <form onSubmit={handleSubmit} className="space-y-3">
-
               <input
                 value={formData.name}
                 onChange={e => setFormData({...formData, name:e.target.value})}
@@ -189,20 +193,19 @@ export default function GroupManager({
               />
 
               <div className="flex gap-2 flex-wrap">
-                {colors.map(c=>(
+                {colors.map(c => (
                   <button
                     key={c.name}
                     type="button"
-                    onClick={()=>setFormData({...formData,color:c.name})}
+                    onClick={() => setFormData({...formData, color:c.name})}
                     className={`w-7 h-7 rounded-full ${c.class} ${
-                      formData.color===c.name && "ring-2 ring-offset-2 ring-indigo-500"
+                      formData.color === c.name && "ring-2 ring-offset-2 ring-indigo-500"
                     }`}
                   />
                 ))}
               </div>
 
               <div className="flex justify-end gap-2">
-
                 <button
                   type="button"
                   onClick={resetForm}
@@ -217,84 +220,81 @@ export default function GroupManager({
                 >
                   Сохранить
                 </button>
-
               </div>
-
             </form>
           )}
-          <div>
 
+          {/* Системные группы */}
+          <div>
             <p className="text-xs uppercase text-gray-500 mb-2">
               Системные
             </p>
 
             <div className="space-y-1">
-
               {systemGroups.map(group => {
-
                 const Icon = group.icon;
 
                 return (
                   <button
                     key={group.id}
-                    onClick={()=>onGroupSelect(group.id)}
+                    onClick={() => onGroupSelect(group.id)}
                     className={`w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                      selectedGroupId===group.id && "bg-indigo-100 dark:bg-indigo-900/30"
+                      selectedGroupId === group.id && "bg-indigo-100 dark:bg-indigo-900/30"
                     }`}
                   >
-
                     <Icon className="w-4 h-4"/>
-
                     <span className="flex-1 text-left">
                       {group.name}
                     </span>
-
                     <span className="text-xs text-gray-500">
                       {group.count}
                     </span>
-
                   </button>
                 );
-
               })}
-
             </div>
-
           </div>
 
+          {/* Мои группы */}
           <div>
-
             <p className="text-xs uppercase text-gray-500 mb-2">
               Мои группы
             </p>
 
             <div className="space-y-2">
-
               {groups.map(group => {
-
                 const Icon = getIcon(group.icon);
                 const expanded = expandedGroups.includes(group.id);
-                const notes = getNotesForGroup(group.id);
+                // ИСПРАВЛЕНО: передаем всю группу, а не только id
+                const groupNotes = getNotesForGroup(group);
 
                 return (
-
                   <div key={group.id}>
-
                     <div
-                      onClick={()=>onGroupSelect(group.id)}
-                      onDragOver={(e)=>{e.preventDefault();setDragOverGroup(group.id)}}
-                      onDrop={(e)=>{
+                      onClick={() => onGroupSelect(group.id)}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOverGroup(group.id);
+                      }}
+                      onDragLeave={() => setDragOverGroup(null)}
+                      onDrop={(e) => {
+                        e.preventDefault();
                         const noteId = e.dataTransfer.getData("note");
-                        onMoveNoteToGroup(Number(noteId), group.id);
+                        if (noteId) {
+                          onMoveNoteToGroup(Number(noteId), group.id);
+                        }
                         setDragOverGroup(null);
                       }}
                       className={`group flex items-center gap-2 p-2 rounded-lg border ${
-                        dragOverGroup===group.id ? "ring-2 ring-indigo-500" : ""
-                      } hover:bg-gray-50 dark:hover:bg-gray-800`}
+                        dragOverGroup === group.id ? "ring-2 ring-indigo-500" : ""
+                      } hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer`}
                     >
-
                       <button
-                        onClick={(e)=>{e.stopPropagation();toggleExpand(group.id)}}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleExpand(group.id);
+                        }}
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
                       >
                         {expanded ?
                           <ChevronDown className="w-4 h-4"/> :
@@ -306,66 +306,101 @@ export default function GroupManager({
                         <Icon className="w-4 h-4"/>
                       </div>
 
-                      <span className="flex-1 text-sm">
+                      <span className="flex-1 text-sm truncate">
                         {group.name}
                       </span>
 
                       <span className="text-xs text-gray-500">
-                        {notes.length}
+                        {groupNotes.length}
                       </span>
 
                       <button
-                        onClick={(e)=>{
+                        onClick={(e) => {
                           e.stopPropagation();
-                          setShowMenu(showMenu===group.id?null:group.id)
+                          setShowMenu(showMenu === group.id ? null : group.id);
                         }}
-                        className="opacity-0 group-hover:opacity-100"
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
                       >
                         <MoreVertical className="w-4 h-4"/>
                       </button>
 
+                      {/* Меню действий */}
+                      {showMenu === group.id && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border py-1 z-10">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEdit(group);
+                              setShowMenu(null);
+                            }}
+                            className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                          >
+                            <Edit2 className="w-4 h-4"/>
+                            Редактировать
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm('Удалить группу?')) {
+                                onGroupDelete(group.id);
+                              }
+                              setShowMenu(null);
+                            }}
+                            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          >
+                            <Trash2 className="w-4 h-4"/>
+                            Удалить
+                          </button>
+                        </div>
+                      )}
                     </div>
 
-
-                    {expanded && (
-
+                    {/* Заметки в группе */}
+                    {expanded && groupNotes.length > 0 && (
                       <div className="ml-7 mt-1 space-y-1">
-
-                        {notes.map(note=>(
+                        {groupNotes.map(note => (
                           <div
                             key={note.id}
                             draggable
-                            onDragStart={(e)=>e.dataTransfer.setData("note",note.id)}
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData("note", note.id);
+                            }}
                             className="flex items-center gap-2 text-xs p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 cursor-grab"
                           >
-
                             <GripVertical className="w-3 h-3 text-gray-400"/>
-
                             <span className="truncate">
                               {note.title || "Без названия"}
                             </span>
-
                           </div>
                         ))}
-
                       </div>
-
                     )}
 
+                    {expanded && groupNotes.length === 0 && (
+                      <div className="ml-7 mt-1 p-2 text-xs text-gray-400 italic">
+                        Нет заметок
+                      </div>
+                    )}
                   </div>
-
                 );
-
               })}
 
+              {groups.length === 0 && (
+                <div className="text-center py-8 text-gray-400">
+                  <Folder className="w-12 h-12 mx-auto mb-2 opacity-20"/>
+                  <p>Нет групп</p>
+                  <button
+                    onClick={() => setShowCreateForm(true)}
+                    className="mt-2 text-indigo-500 hover:text-indigo-600"
+                  >
+                    Создать первую группу
+                  </button>
+                </div>
+              )}
             </div>
-
           </div>
-
         </div>
-
       </div>
-
     </div>
   );
 }
