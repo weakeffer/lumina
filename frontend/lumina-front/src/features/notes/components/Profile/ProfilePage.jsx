@@ -77,6 +77,10 @@ const ProfilePage = () => {
     [notes]
   );
 
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem('viewMode') || 'sidebar';
+  });
+
   // Инициализация формы при загрузке пользователя
   useEffect(() => {
     if (user) {
@@ -352,6 +356,8 @@ const ProfilePage = () => {
                 onSave={handleSave}
                 themeClasses={themeClasses}
                 getThemeIcon={getThemeIcon}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
               />
             )}
           </div>

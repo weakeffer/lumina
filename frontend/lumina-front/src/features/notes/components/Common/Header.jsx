@@ -34,6 +34,7 @@ const Header = ({
   onToggleMobileMenu,
   themeClasses,
   navigate,
+  children, // 👈 ДОБАВИТЬ ЭТУ СТРОКУ
 }) => {
   return (
     <div className={`flex items-center justify-between px-4 h-16 border-b ${themeClasses.colors.border.primary} backdrop-blur-sm bg-opacity-90 sticky top-0 z-10`}>
@@ -82,6 +83,9 @@ const Header = ({
             {groups?.find(g => g.id === selectedGroup)?.name || 'Группа'}
           </div>
         )}
+        
+        {/* 👇 ВОТ СЮДА ДОБАВЛЯЕМ children */}
+        {children}
         
         <ActionButton 
           icon={Plus} 

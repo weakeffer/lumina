@@ -9,27 +9,39 @@ const NoteList = memo(({
   onNoteDelete,
   onToggleFavorite,
   loading = false,
-  viewMode = 'grid',
+  viewMode = 'grid', // 'grid', 'list', 'compact'
   selectedNotes = new Set(),
   onToggleSelection,
   isBulkMode = false,
   onDragStart,
   onDragEnd,
   draggedNote,
+  groups = [], // Добавляем группы для передачи в NoteItem
 }) => {
   // Мемоизируем скелетоны для избежания лишних ререндеров
   const skeletons = useMemo(() => {
-    return Array(6).fill(0).map((_, i) => (
+    return Array(viewMode === 'grid' ? 6 : 4).fill(0).map((_, i) => (
       <NoteItemSkeleton key={`skeleton-${i}`} viewMode={viewMode} />
     ));
   }, [viewMode]);
 
+  // Определяем классы для контейнера в зависимости от режима
+  const containerClasses = useMemo(() => {
+    switch(viewMode) {
+      case 'grid':
+        return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4";
+      case 'list':
+        return "space-y-3 p-4";
+      case 'compact':
+        return "flex flex-col p-2 space-y-0.5";
+      default:
+        return "p-4";
+    }
+  }, [viewMode]);
+
   if (loading) {
     return (
-      <div className={viewMode === 'grid' 
-        ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4"
-        : "space-y-2 p-4"
-      }>
+      <div className={containerClasses}>
         {skeletons}
       </div>
     );
@@ -45,12 +57,7 @@ const NoteList = memo(({
   }
 
   return (
-    <div className={viewMode === 'grid' 
-      ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4"
-      : viewMode === 'list'
-      ? "space-y-2 p-4"
-      : "flex flex-col p-4" // compact mode
-    }>
+    <div className={containerClasses}>
       {notes.map((note) => (
         <div
           key={note.id}
@@ -62,13 +69,14 @@ const NoteList = memo(({
           <NoteItem
             note={note}
             isSelected={selectedNote?.id === note.id}
-            onSelect={() => onNoteSelect(note)}
-            onDelete={() => onNoteDelete(note.id)}
-            onToggleFavorite={() => onToggleFavorite(note.id)}
+            onSelect={onNoteSelect}
+            onDelete={onNoteDelete}
+            onToggleFavorite={onToggleFavorite}
             viewMode={viewMode}
             isSelectedForBulk={selectedNotes.has(note.id)}
-            onToggleSelection={() => onToggleSelection?.(note.id)}
+            onToggleSelection={onToggleSelection}
             isBulkMode={isBulkMode}
+            groups={groups}
           />
         </div>
       ))}

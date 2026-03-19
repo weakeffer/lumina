@@ -11,7 +11,9 @@ import {
   FileText,
   Plus,
   Trash2,
-  Heart
+  Heart,
+  Settings,
+  Tag
 } from "lucide-react";
 import { useTheme } from "./ThemeContext";
 
@@ -43,15 +45,7 @@ const NoteSidebar = ({
 }) => {
   const { themeClasses } = useTheme();
   const [expandedGroups, setExpandedGroups] = useState(["all"]);
-
-  // Отладка: посмотрим, что приходит в пропсах
-  useEffect(() => {
-    console.log('📊 NoteSidebar получил группы:', groups);
-    if (groups.length > 0) {
-      console.log('📊 Пример группы:', groups[0]);
-      console.log('📊 Есть notes_count?', groups[0].notes_count);
-    }
-  }, [groups]);
+  const [isHovering, setIsHovering] = useState(false);
 
   // Автоматически раскрывать группу при выборе
   useEffect(() => {
@@ -95,23 +89,17 @@ const NoteSidebar = ({
 
   // Пользовательские группы
   const userGroups = groups.map(group => {
-    // Пытаемся найти заметки для этой группы
     let groupNotes = [];
     
-    // Если в группе уже есть поле notes (из /notes/by-groups/), используем его
     if (group.notes && Array.isArray(group.notes)) {
       groupNotes = group.notes;
     } else {
-      // Ищем заметки по ID группы в groupedNotes
-      // Сначала по специальному ключу group_ID
       if (groupedNotes[`group_${group.id}`]) {
         groupNotes = groupedNotes[`group_${group.id}`];
       } 
-      // Затем по названию
       else if (groupedNotes[group.name]) {
         groupNotes = groupedNotes[group.name];
       } 
-      // Ищем по group_id в заметках
       else {
         for (const [key, notes] of Object.entries(groupedNotes)) {
           const hasNoteWithGroupId = notes.some(note => 
@@ -130,7 +118,6 @@ const NoteSidebar = ({
       name: group.name,
       icon: Folder,
       notes: groupNotes,
-      // ИСПОЛЬЗУЕМ notes_count из ответа сервера
       notes_count: group.notes_count !== undefined 
         ? group.notes_count 
         : groupNotes.length,
@@ -156,13 +143,21 @@ const NoteSidebar = ({
 
       <aside
         className={`
-        ${isMobile ? "fixed left-0 top-0 bottom-0 z-50 w-80" : "relative"}
+        ${isMobile ? "fixed left-0 top-0 bottom-0 z-50" : "relative"}
         ${themeClasses.colors.sidebar.bg}
         border-r ${themeClasses.colors.border.primary}
         flex flex-col h-screen
         transition-all duration-300
-        ${collapsed && !isMobile ? "w-20" : "w-80"}
       `}
+        style={{ 
+          width: isMobile 
+            ? '20rem' // 320px для мобильных
+            : collapsed 
+              ? '5rem' // 80px для свернутого
+              : '100%' // 100% от родителя для растягивания
+        }}
+        onMouseEnter={() => !isMobile && setIsHovering(true)}
+        onMouseLeave={() => !isMobile && setIsHovering(false)}
       >
         {/* Заголовок */}
         <div
@@ -201,10 +196,128 @@ const NoteSidebar = ({
           </div>
         </div>
 
-        {/* Основной контент */}
-        <div className="flex-1 overflow-y-auto py-2">
-          {/* Системные группы */}
-          {!collapsed && (
+        {/* Подсказка для разворачивания в свернутом состоянии */}
+        {collapsed && !isMobile && isHovering && (
+          <div className="absolute inset-0 bg-indigo-500/5 flex items-center justify-center pointer-events-none z-10">
+            <div className="bg-indigo-500 text-white text-xs px-3 py-2 rounded-lg shadow-lg animate-pulse">
+              Потяните вправо чтобы развернуть
+            </div>
+          </div>
+        )}
+
+        {/* Индикатор авто-сворачивания */}
+        {!collapsed && !isMobile && (
+          <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 
+            bg-indigo-500 text-white text-xs px-3 py-2 rounded-lg whitespace-nowrap
+            opacity-0 hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+            Потяните до упора влево чтобы свернуть
+          </div>
+        )}
+
+        {/* Иконки для свернутого состояния */}
+        {collapsed && !isMobile && (
+          <div className="flex flex-col items-center py-4 space-y-4">
+            <button
+              onClick={onCreateNote}
+              className="p-2 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/20 transition-colors group relative"
+              title="Создать заметку"
+            >
+              <Plus className="w-5 h-5 text-green-500" />
+              <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded 
+                opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                Создать заметку
+              </span>
+            </button>
+
+            <button
+              onClick={() => onGroupSelect("all")}
+              className={`p-2 rounded-lg transition-colors group relative
+                ${selectedGroup === "all" 
+                  ? "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600" 
+                  : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"}`}
+              title="Все заметки"
+            >
+              <Grid className="w-5 h-5" />
+              <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded 
+                opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                Все заметки
+              </span>
+            </button>
+
+            <button
+              onClick={() => onGroupSelect("favorites")}
+              className={`p-2 rounded-lg transition-colors group relative
+                ${selectedGroup === "favorites" 
+                  ? "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600" 
+                  : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"}`}
+              title="Избранное"
+            >
+              <Star className="w-5 h-5" />
+              <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded 
+                opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                Избранное
+              </span>
+            </button>
+
+            <button
+              onClick={() => onGroupSelect("images")}
+              className={`p-2 rounded-lg transition-colors group relative
+                ${selectedGroup === "images" 
+                  ? "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600" 
+                  : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"}`}
+              title="С изображениями"
+            >
+              <ImageIcon className="w-5 h-5" />
+              <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded 
+                opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                С изображениями
+              </span>
+            </button>
+
+            <div className="w-8 border-t border-gray-200 dark:border-gray-700 my-2"></div>
+
+            <button
+              onClick={onOpenGroupManager}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group relative"
+              title="Управление группами"
+            >
+              <Folder className="w-5 h-5 text-gray-500" />
+              <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded 
+                opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                Группы
+              </span>
+            </button>
+
+            {tags.length > 0 && (
+              <button
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group relative"
+                title="Теги"
+              >
+                <Tag className="w-5 h-5 text-gray-500" />
+                <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded 
+                  opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                  Теги
+                </span>
+              </button>
+            )}
+
+            <button
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group relative"
+              title="Настройки"
+            >
+              <Settings className="w-5 h-5 text-gray-500" />
+              <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded 
+                opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                Настройки
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* Основной контент (показывается только когда не свернуто) */}
+        {!collapsed && (
+          <div className="flex-1 overflow-y-auto py-2">
+            {/* Системные группы */}
             <SidebarSection title="Заметки">
               {systemGroups.map(group => (
                 <SidebarGroup
@@ -229,16 +342,54 @@ const NoteSidebar = ({
                 />
               ))}
             </SidebarSection>
-          )}
 
-          {/* Пользовательские группы */}
-          {!collapsed && userGroups.length > 0 && (
-            <SidebarSection title="Группы">
-              {userGroups.map(group => (
+            {/* Пользовательские группы */}
+            {userGroups.length > 0 && (
+              <SidebarSection title="Группы">
+                {userGroups.map(group => (
+                  <SidebarGroup
+                    key={group.id}
+                    group={group}
+                    notes={group.notes}
+                    selectedGroup={selectedGroup}
+                    expandedGroups={expandedGroups}
+                    toggleGroup={toggleGroup}
+                    onGroupSelect={onGroupSelect}
+                    selectedNote={selectedNote}
+                    onNoteSelect={onNoteSelect}
+                    onNoteDelete={onNoteDelete}
+                    onToggleFavorite={onToggleFavorite}
+                    onMoveNoteToGroup={onMoveNoteToGroup}
+                    onDragStart={onDragStart}
+                    onDragEnd={onDragEnd}
+                    onDragOver={onDragOver}
+                    onDrop={onDrop}
+                    dragOverGroup={dragOverGroup}
+                    favorites={favorites}
+                  />
+                ))}
+
+                <button
+                  onClick={onOpenGroupManager}
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-indigo-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg w-full transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Новая группа
+                </button>
+              </SidebarSection>
+            )}
+
+            {/* Заметки без группы */}
+            {noGroupNotes.length > 0 && (
+              <SidebarSection title="Без группы">
                 <SidebarGroup
-                  key={group.id}
-                  group={group}
-                  notes={group.notes}
+                  group={{
+                    id: "none",
+                    name: "Без группы",
+                    icon: FileText,
+                    notes_count: noGroupNotesCount
+                  }}
+                  notes={noGroupNotes}
                   selectedGroup={selectedGroup}
                   expandedGroups={expandedGroups}
                   toggleGroup={toggleGroup}
@@ -255,48 +406,10 @@ const NoteSidebar = ({
                   dragOverGroup={dragOverGroup}
                   favorites={favorites}
                 />
-              ))}
-
-              <button
-                onClick={onOpenGroupManager}
-                className="flex items-center gap-2 px-4 py-2 text-sm text-indigo-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg w-full transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Новая группа
-              </button>
-            </SidebarSection>
-          )}
-
-          {/* Заметки без группы */}
-          {noGroupNotes.length > 0 && !collapsed && (
-            <SidebarSection title="Без группы">
-              <SidebarGroup
-                group={{
-                  id: "none",
-                  name: "Без группы",
-                  icon: FileText,
-                  notes_count: noGroupNotesCount
-                }}
-                notes={noGroupNotes}
-                selectedGroup={selectedGroup}
-                expandedGroups={expandedGroups}
-                toggleGroup={toggleGroup}
-                onGroupSelect={onGroupSelect}
-                selectedNote={selectedNote}
-                onNoteSelect={onNoteSelect}
-                onNoteDelete={onNoteDelete}
-                onToggleFavorite={onToggleFavorite}
-                onMoveNoteToGroup={onMoveNoteToGroup}
-                onDragStart={onDragStart}
-                onDragEnd={onDragEnd}
-                onDragOver={onDragOver}
-                onDrop={onDrop}
-                dragOverGroup={dragOverGroup}
-                favorites={favorites}
-              />
-            </SidebarSection>
-          )}
-        </div>
+              </SidebarSection>
+            )}
+          </div>
+        )}
       </aside>
     </>
   );
@@ -337,9 +450,6 @@ const SidebarGroup = ({
   const isExpanded = expandedGroups.includes(group.id);
   const isActive = String(selectedGroup) === String(group.id);
   const Icon = group.icon;
-
-  // ИСПРАВЛЕНИЕ: используем notes_count из группы, если он есть
-  // Иначе считаем длину массива notes
   const noteCount = group.notes_count !== undefined 
     ? group.notes_count 
     : notes.length;
@@ -377,7 +487,6 @@ const SidebarGroup = ({
           {group.name}
         </span>
 
-        {/* ИСПРАВЛЕНИЕ: отображаем правильное количество */}
         <span className="text-xs text-gray-400">
           {noteCount}
         </span>

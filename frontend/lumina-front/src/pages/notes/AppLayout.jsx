@@ -1,7 +1,9 @@
 import React from 'react';
 import { useTheme } from './ThemeContext';
+import { useViewMode } from './ViewModeContext';
 import ResizableSidebarLayout from './ResizableSidebarLayout';
 import ParticleBackground from './ParticleBackground';
+import { VIEW_MODES } from '../../features/notes/components/Profile/ProfileConstants';
 
 const AppLayout = ({
   children,
@@ -13,6 +15,10 @@ const AppLayout = ({
   isMobile
 }) => {
   const { themeClasses } = useTheme();
+  const { viewMode } = useViewMode();
+  
+  const isSidebarMode = viewMode === VIEW_MODES.SIDEBAR;
+  const actualSidebar = isSidebarMode ? sidebar : null;
 
   return (
     <div className="h-screen flex flex-col overflow-hidden relative">
@@ -26,10 +32,17 @@ const AppLayout = ({
 
         <div className="flex-1 min-h-0 overflow-hidden">
           <ResizableSidebarLayout
-            sidebar={sidebar}
+            sidebar={actualSidebar}
             rightPanel={rightPanel}
-            collapsed={sidebarCollapsed}
+            min={240}
+            max={520}
+            collapsedWidth={72}
+            defaultWidth={320}
             isMobile={isMobile}
+            sidebarCollapsed={sidebarCollapsed}
+            onToggleCollapse={() => {
+              // Пустой коллбэк, так как состояние управляется через props
+            }}
           >
             {children}
           </ResizableSidebarLayout>

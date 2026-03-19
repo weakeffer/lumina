@@ -1,9 +1,9 @@
 import React from 'react';
 import { 
   Sparkles, Bell, Clock, Shield, Download, Upload, 
-  Save, Globe, Zap 
+  Save, Globe, Zap, Layout 
 } from 'lucide-react';
-import { THEMES, AUTO_SAVE_OPTIONS } from './ProfileConstants';
+import { THEMES, AUTO_SAVE_OPTIONS, VIEW_MODES, VIEW_MODE_LABELS } from './ProfileConstants';
 
 const SettingsTab = ({
   formData,
@@ -11,12 +11,14 @@ const SettingsTab = ({
   soundEffects,
   analyticsEnabled,
   autoSaveInterval,
+  viewMode,
   loading,
   onThemeChange,
   onEmailNotificationsChange,
   onSoundEffectsChange,
   onAnalyticsChange,
   onAutoSaveChange,
+  onViewModeChange,
   onExportData,
   onImportData,
   onSave,
@@ -25,7 +27,6 @@ const SettingsTab = ({
 }) => {
   return (
     <div className="space-y-6">
-      {/* Тема оформления */}
       <div>
         <h3 className={`text-lg font-semibold ${themeClasses.colors.text.primary} mb-3 flex items-center`}>
           <Sparkles className="w-5 h-5 mr-2 text-indigo-500" />
@@ -62,7 +63,39 @@ const SettingsTab = ({
         </div>
       </div>
 
-      {/* Уведомления */}
+      <div>
+        <h3 className={`text-lg font-semibold ${themeClasses.colors.text.primary} mb-3 flex items-center`}>
+          <Layout className="w-5 h-5 mr-2 text-indigo-500" />
+          Вид списка заметок
+        </h3>
+        <div className="grid grid-cols-3 gap-3">
+          {Object.entries(VIEW_MODES).map(([key, mode]) => (
+            <button
+              key={mode}
+              onClick={() => onViewModeChange(mode)}
+              className={`p-4 rounded-xl border-2 transition-all duration-300
+                ${viewMode === mode
+                  ? 'border-indigo-500 bg-indigo-500/10 shadow-lg shadow-indigo-500/20'
+                  : `border-transparent ${themeClasses.colors.bg.secondary} hover:border-gray-300`
+                }`}
+            >
+              <div className={`text-center ${
+                viewMode === mode ? 'text-indigo-500' : themeClasses.colors.text.primary
+              }`}>
+                <div className="text-2xl mb-2">
+                  {mode === 'sidebar' && '📑'}
+                  {mode === 'grid' && '🔲'}
+                  {mode === 'list' && '📋'}
+                </div>
+                <span className="text-xs font-medium">
+                  {VIEW_MODE_LABELS[mode]}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div>
         <h3 className={`text-lg font-semibold ${themeClasses.colors.text.primary} mb-3 flex items-center`}>
           <Bell className="w-5 h-5 mr-2 text-indigo-500" />
@@ -113,8 +146,6 @@ const SettingsTab = ({
           />
         </label>
       </div>
-
-      {/* Интервал автосохранения */}
       <div>
         <h3 className={`text-lg font-semibold ${themeClasses.colors.text.primary} mb-3 flex items-center`}>
           <Clock className="w-5 h-5 mr-2 text-indigo-500" />
@@ -136,7 +167,6 @@ const SettingsTab = ({
         </select>
       </div>
 
-      {/* Приватность */}
       <div>
         <h3 className={`text-lg font-semibold ${themeClasses.colors.text.primary} mb-3 flex items-center`}>
           <Shield className="w-5 h-5 mr-2 text-indigo-500" />
@@ -166,7 +196,6 @@ const SettingsTab = ({
         </label>
       </div>
 
-      {/* Экспорт/Импорт */}
       <div className="grid grid-cols-2 gap-4 pt-4">
         <button 
           onClick={onExportData}
@@ -195,7 +224,6 @@ const SettingsTab = ({
         </label>
       </div>
 
-      {/* Кнопка сохранения настроек */}
       <div className="flex justify-end pt-4">
         <button
           onClick={onSave}

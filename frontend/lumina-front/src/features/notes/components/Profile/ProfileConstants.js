@@ -1,5 +1,5 @@
 import { 
-  Sun, Moon, Coffee, Feather, BookOpen 
+  Sun, Moon, Coffee, Feather, BookOpen, Layout, Grid, List 
 } from 'lucide-react';
 
 export const THEMES = [
@@ -22,3 +22,23 @@ export const TABS = [
   { id: 'stats', icon: 'TrendingUp', label: 'Статистика' },
   { id: 'settings', icon: 'Settings', label: 'Настройки' }
 ];
+
+export const VIEW_MODES = {
+  SIDEBAR: 'sidebar',
+  GRID: 'grid',
+  LIST: 'list',
+  COMPACT: 'compact' // Добавлен компактный режим
+};
+
+export const VIEW_MODE_LABELS = {
+  [VIEW_MODES.SIDEBAR]: 'Сайдбар',
+  [VIEW_MODES.GRID]: 'Сетка',
+  [VIEW_MODES.LIST]: 'Список',
+  [VIEW_MODES.COMPACT]: 'Компактный' // Добавлена метка
+};
+
+export const VIEW_MODE_ICONS = {
+  [VIEW_MODES.SIDEBAR]: Layout,
+  [VIEW_MODES.GRID]: Grid,
+  [VIEW_MODES.LIST]: List
+};

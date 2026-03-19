@@ -1,9 +1,10 @@
+// frontend/lumina-front/src/App.jsx
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './pages/notes/ThemeContext';
 import { SettingsProvider } from './pages/notes/SettingsContext';
+import { ViewModeProvider } from './pages/notes/ViewModeContext';
 
-// Импортируем старые страницы (пока оставляем)
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import AuthLayout from './pages/auth/AuthLayout';
@@ -22,46 +23,48 @@ function App() {
   return (
     <ThemeProvider>
       <SettingsProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* Auth routes */}
-            <Route element={<AuthLayout />}>
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-            </Route>
+        <ViewModeProvider> {/* Добавлен новый провайдер */}
+          <BrowserRouter>
+            <Routes>
+              {/* Auth routes */}
+              <Route element={<AuthLayout />}>
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+              </Route>
 
-            {/* Protected routes - используем новую страницу */}
-            <Route
-              path="/"
-              element={
-                <PrivateRoute>
-                  <NotesPage />
-                </PrivateRoute>
-              }
-            />
-            
-            <Route
-              path="/note/:id"
-              element={
-                <PrivateRoute>
-                  <NotesPage />
-                </PrivateRoute>
-              }
-            />
-            
-            <Route
-              path="/profile"
-              element={
-                <PrivateRoute>
-                  <ProfilePage />
-                </PrivateRoute>
-              }
-            />
+              {/* Protected routes - используем новую страницу */}
+              <Route
+                path="/"
+                element={
+                  <PrivateRoute>
+                    <NotesPage />
+                  </PrivateRoute>
+                }
+              />
+              
+              <Route
+                path="/note/:id"
+                element={
+                  <PrivateRoute>
+                    <NotesPage />
+                  </PrivateRoute>
+                }
+              />
+              
+              <Route
+                path="/profile"
+                element={
+                  <PrivateRoute>
+                    <ProfilePage />
+                  </PrivateRoute>
+                }
+              />
 
-            {/* Redirect to notes if route not found */}
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </BrowserRouter>
+              {/* Redirect to notes if route not found */}
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </BrowserRouter>
+        </ViewModeProvider>
       </SettingsProvider>
     </ThemeProvider>
   );
