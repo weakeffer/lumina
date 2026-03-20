@@ -1,7 +1,6 @@
-// frontend/lumina-front/src/components/ui/ViewModeToggle.jsx
 import React from 'react';
 import { LayoutGrid, List, Menu, Sidebar } from 'lucide-react';
-import { VIEW_MODES } from '../../features/notes/components/Profile/ProfileConstants';
+import { VIEW_MODES } from '../../profile/constants';
 
 const ViewModeToggle = ({ viewMode, onChange, className = '' }) => {
   const modes = [
