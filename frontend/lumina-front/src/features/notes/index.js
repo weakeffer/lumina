@@ -1,23 +1,37 @@
-export { default as NotesPage } from './components/NotesPage/NotesPage';
-export { default as ProfilePage } from './components/Profile/ProfilePage';
 export { useNotes } from './hooks/useNotes';
-export { useNote } from './hooks/useNotes';
-export { useTrashNotes } from './hooks/useNotes';
-export { useSearchNotes } from './hooks/useNotes';
-export { useNotesByGroups } from './hooks/useNotes';
 export { useNoteMutations } from './hooks/useNoteMutations';
-export { useGroups } from './hooks/useGroups';
-export { useGroupNotes } from './hooks/useGroups';
-export { useGroupMutations } from './hooks/useGroups';
-export { useTags } from './hooks/useTags';
-export { usePopularTags } from './hooks/useTags';
-export { useTagMutations } from './hooks/useTags';
-export { useNoteUI } from './hooks/useNoteUI';
 export { useNoteFilters } from './hooks/useNoteFilters';
-export { useProfile } from './hooks/useProfile';
-export { useProfileMutations } from './hooks/useProfile';
-export { useProfileStats } from './hooks/useProfileStats';
-export { notesApi } from './api/notesApi';
-export { groupsApi } from './api/groupsApi';
-export { tagsApi } from './api/tagsApi';
-export { profileApi } from './api/profileApi';
+export { useNoteUI } from './hooks/useNoteUI';
+export { useGroups } from './hooks/useGroups';
+export { useTags } from './hooks/useTags';
+
+// Компоненты
+export { NoteList } from './components/NoteList/NoteList';
+export { NoteEditor } from './components/NoteEditor';
+export { NoteModal } from './components/NoteModal';
+export { NoteSidebar } from './components/NoteSidebar';
+export { GroupManager } from './components/GroupManager';
+export { TagManager } from './components/TagManager';
+export { SearchFilters } from './components/SearchFilters';
+export { TrashBin } from './components/TrashBin';
+export { WelcomeScreen } from './components/WelcomeScreen';
+export { QuickActions } from './components/QuickActions';
+export { MiniStatistics } from './components/MiniStatistics';
+export { StatisticsPanel } from './components/StatisticsPanel';
+export { SettingsPanel } from './components/SettingsPanel';
+export { ResizableSidebarLayout } from './components/ResizableSidebarLayout';
+export { ImageUploader } from './components/ImageUploader';
+export { MarkdownPreview } from './components/MarkdownPreview';
+export { DeleteConfirmModal } from './components/DeleteConfirmModal';
+export { ActionButton } from './components/ActionButton';
+export { AppLayout } from './components/AppLayout';
+
+// Компоненты отображения
+export { NoteListView } from './components/NoteView/NoteListView';
+export { NoteGridView } from './components/NoteView/NoteGridView';
+export { NoteItemSkeleton } from './components/NoteList/NoteItemSkeleton';
+
+// Общие компоненты
+export { Header } from './components/Common/Header';
+export { Footer } from './components/Common/Footer';
+export { Notification } from './components/Common/Notification';

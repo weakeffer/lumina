@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { useDebounce } from '../../../shared/hooks/useDebounce';
+import { useDebounce } from '../../../shared/lib/hooks/useDebounce';
 
 const initialFilters = {
   searchQuery: '',

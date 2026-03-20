@@ -1,4 +1,4 @@
-import { api } from '../../../api/api';
+import { api } from '../../../shared/api/api';
 
 export const groupsApi = {
   // Получение всех групп (без заметок) - для администрирования групп

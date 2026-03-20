@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { notesApi } from '../api/notesApi';
-import { QUERY_KEYS } from '../../../shared/constants/queryKeys';
+import { QUERY_KEYS } from '../../../shared/lib/constants/queryKeys';
 
 export const useNotes = (filters = {}, options = {}) => {
   return useQuery({

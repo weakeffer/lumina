@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { groupsApi } from '../api/groupsApi';
-import { QUERY_KEYS } from '../../../shared/constants/queryKeys';
+import { QUERY_KEYS } from '../../../shared/lib/constants/queryKeys';
 
 // Хук для получения групп без заметок
 export const useGroups = () => {

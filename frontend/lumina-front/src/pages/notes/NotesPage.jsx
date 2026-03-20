@@ -1,31 +1,30 @@
-// frontend/lumina-front/src/features/notes/components/NotesPage/NotesPage.jsx
 import React, { useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useTheme } from '../../../../pages/notes/ThemeContext';
-import { useViewMode } from '../../../../pages/notes/ViewModeContext';
-import { VIEW_MODES } from '../Profile/ProfileConstants';
-import AppLayout from '../../../../pages/notes/AppLayout';
-import NoteSidebar from '../../../../pages/notes/NoteSideBar';
-import NoteEditor from '../../../../pages/notes/NoteEditor';
-import WelcomeScreen from '../../../../pages/notes/WelcomeScreen';
-import SearchFilters from '../../../../pages/notes/SearchFilters';
-import TagManager from '../../../../pages/notes/TagManager';
-import TrashBin from '../../../../pages/notes/TrashBin';
-import SettingsPanel from '../../../../pages/notes/SettingsPanel';
-import GroupManager from '../../../../pages/notes/GroupManager';
-import MiniStatistics from '../../../../pages/notes/MiniStatistics';
-import DeleteConfirmModal from '../../../../pages/notes/DeleteConfirmModal';
-import { useNotes, useTrashNotes, useNotesByGroups } from '../../hooks/useNotes';
-import { useNoteMutations } from '../../hooks/useNoteMutations';
-import { useGroupsWithNotes, useGroupMutations } from '../../hooks/useGroups';
-import { useTags } from '../../hooks/useTags';
-import { useNoteUI } from '../../hooks/useNoteUI';
-import { useNoteFilters } from '../../hooks/useNoteFilters';
-import NoteList from '../NoteList/NoteList'; // Используем NoteList вместо отдельных компонентов
-import Header from '../Common/Header';
-import Footer from '../Common/Footer';
-import Notification from '../Common/Notification';
-import ViewModeToggle from '../../../../components/ui/ViewModeToggle';
+import { useTheme } from '../../shared/context/ThemeContext';
+import { useViewMode } from '../../shared/context/ViewModeContext';
+import { VIEW_MODES } from '../../features/profile/constants';
+import AppLayout from '../../features/notes/components/AppLayout';
+import NoteSidebar from '../../features/notes/components/NoteSidebar'; 
+import NoteEditor from '../../features/notes/components/NoteEditor';
+import WelcomeScreen from '../../features/notes/components/WelcomeScreen';
+import SearchFilters from '../../features/notes/components/SearchFilters';
+import TagManager from '../../features/notes/components/TagManager';
+import TrashBin from '../../features/notes/components/TrashBin';
+import SettingsPanel from '../../features/notes/components/SettingsPanel';
+import GroupManager from '../../features/notes/components/GroupManager';
+import MiniStatistics from '../../features/notes/components/MiniStatistics';
+import DeleteConfirmModal from '../../features/notes/components/DeleteConfirmModal';
+import { useNotes, useTrashNotes, useNotesByGroups } from '../../features/notes/hooks/useNotes';
+import { useNoteMutations } from '../../features/notes/hooks/useNoteMutations';
+import { useGroupsWithNotes, useGroupMutations } from '../../features/notes/hooks/useGroups';
+import { useTags } from '../../features/notes/hooks/useTags';
+import { useNoteUI } from '../../features/notes/hooks/useNoteUI';
+import { useNoteFilters } from '../../features/notes/hooks/useNoteFilters';
+import NoteList from '../../features/notes/components/NoteList/NoteList';
+import Header from '../../features/notes/components/Common/Header';
+import Footer from '../../features/notes/components/Common/Footer';
+import Notification from '../../features/notes/components/Common/Notification';
+import ViewModeToggle from '../../shared/ui/ViewModeToggle';
 
 const NotesPage = () => {
   const { id } = useParams();

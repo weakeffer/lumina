@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tagsApi } from '../api/tagsApi';
-import { QUERY_KEYS } from '../../../shared/constants/queryKeys';
+import { QUERY_KEYS } from '../../../shared/lib/constants/queryKeys';
 
 export const useTags = () => {
   return useQuery({

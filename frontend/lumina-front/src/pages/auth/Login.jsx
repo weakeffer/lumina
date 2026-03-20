@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import AuthLayout from './AuthLayout';
 import Input from '../../components/ui/Input';
-import { api } from '../../api/api';
+import { api } from '../../shared/api/api';
 
 const Login = () => {
   const navigate = useNavigate();

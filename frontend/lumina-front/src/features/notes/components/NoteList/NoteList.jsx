@@ -1,5 +1,5 @@
 import React, { memo, useMemo } from 'react';
-import NoteItem from '../../../../pages/notes/NoteItem';
+import NoteItem from '../NoteItem';
 import { NoteItemSkeleton } from './NoteItemSkeleton';
 
 const NoteList = memo(({

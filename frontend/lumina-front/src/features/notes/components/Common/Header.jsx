@@ -11,8 +11,8 @@ import {
   Zap,
   WifiOff
 } from 'lucide-react';
-import ActionButton from '../../../../pages/notes/ActionButton';
-import QuickActions from '../../../../pages/notes/QuickActions';
+import ActionButton from '../ActionButton';
+import QuickActions from '../QuickActions';
 
 /**
  * Компонент заголовка

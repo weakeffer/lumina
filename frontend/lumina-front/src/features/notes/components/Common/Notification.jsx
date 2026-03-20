@@ -1,8 +1,5 @@
 import React, { useEffect } from 'react';
 
-/**
- * Компонент уведомлений
- */
 const Notification = ({ notification, onClose }) => {
   useEffect(() => {
     if (notification) {
