@@ -7,7 +7,8 @@ import AppLayout from '../../features/notes/components/AppLayout';
 import NoteSidebar from '../../features/notes/components/NoteSidebar'; 
 import NoteEditor from '../../features/notes/components/NoteEditor';
 import WelcomeScreen from '../../features/notes/components/WelcomeScreen';
-import SearchFilters from '../../features/notes/components/SearchFilters';
+// Убираем импорт SearchFilters
+// import SearchFilters from '../../features/notes/components/SearchFilters';
 import TagManager from '../../features/notes/components/TagManager';
 import TrashBin from '../../features/notes/components/TrashBin';
 import SettingsPanel from '../../features/notes/components/SettingsPanel';
@@ -64,7 +65,7 @@ const NotesPage = () => {
     closeMobileMenu,
     toggleStatistics,
     toggleSettings,
-    toggleSearchFilters,
+    toggleSearchFilters, // Убираем вызовы этого, но пока оставим для совместимости
     toggleTagManager,
     toggleTrash,
     toggleGroupManager,
@@ -370,6 +371,14 @@ const NotesPage = () => {
             onToggleMobileMenu={toggleMobileMenu}
             themeClasses={themeClasses}
             navigate={navigate}
+            filteredNotes={filteredNotes}
+            tags={tags}
+            selectedTags={filters.selectedTags}
+            onTagToggle={toggleTag}
+            favoriteOnly={filters.favoriteOnly}
+            setFavoriteOnly={(value) => updateFilter('favoriteOnly', value)}
+            onNoteSelect={handleNoteSelect}
+            activeFiltersCount={activeFiltersCount}
           >
             <ViewModeToggle 
               viewMode={viewMode} 
@@ -440,27 +449,6 @@ const NotesPage = () => {
               groups={groupsWithNotes}
             />
           </div>
-        )}
-
-        {/* Модальные окна */}
-        {uiState.isSearchFiltersOpen && (
-          <SearchFilters
-            selectedTags={filters.selectedTags}
-            setSelectedTags={(tags) => updateFilter('selectedTags', tags)}
-            favoriteOnly={filters.favoriteOnly}
-            setFavoriteOnly={(value) => updateFilter('favoriteOnly', value)}
-            dateRange={filters.dateRange}
-            setDateRange={(from, to) => updateFilter('dateRange', { from, to })}
-            sortBy={filters.sortBy}
-            setSortBy={(value) => updateFilter('sortBy', value)}
-            sortOrder={filters.sortOrder}
-            setSortOrder={(value) => updateFilter('sortOrder', value)}
-            tags={tags}
-            groups={groupsWithNotes}
-            selectedGroup={filters.selectedGroup}
-            setSelectedGroup={(value) => updateFilter('selectedGroup', value)}
-            onClose={toggleSearchFilters}
-          />
         )}
 
         {uiState.isTagManagerOpen && (

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react'; // Добавляем useState
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -13,10 +13,8 @@ import {
 } from 'lucide-react';
 import ActionButton from '../ActionButton';
 import QuickActions from '../QuickActions';
+import SmartSearchDropdown from '../SmartSearchDropdown'; // Импортируем новый компонент
 
-/**
- * Компонент заголовка
- */
 const Header = ({
   isMobile,
   isOnline,
@@ -34,8 +32,29 @@ const Header = ({
   onToggleMobileMenu,
   themeClasses,
   navigate,
-  children, // 👈 ДОБАВИТЬ ЭТУ СТРОКУ
+  children,
+  // Новые пропсы для поиска
+  filteredNotes,
+  tags,
+  selectedTags,
+  onTagToggle,
+  favoriteOnly,
+  setFavoriteOnly,
+  onNoteSelect,
 }) => {
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+
+  const handleSearchFocus = () => {
+    setIsSearchDropdownOpen(true);
+  };
+
+  const handleSearchChange = (value) => {
+    onSearchChange(value);
+    if (value.trim()) {
+      setIsSearchDropdownOpen(true);
+    }
+  };
+
   return (
     <div className={`flex items-center justify-between px-4 h-16 border-b ${themeClasses.colors.border.primary} backdrop-blur-sm bg-opacity-90 sticky top-0 z-10`}>
       <div className="flex items-center gap-3">
@@ -66,13 +85,32 @@ const Header = ({
       </div>
             
       {!isMobile && (
-        <div className="flex-1 max-w-xl mx-6 relative group">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
-          <input
-            className="w-full pl-9 pr-4 py-2 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all group-focus-within:shadow-lg"
-            placeholder="Поиск..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
+        <div className="flex-1 max-w-xl mx-6 relative">
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
+            <input
+              className="w-full pl-9 pr-4 py-2 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all group-focus-within:shadow-lg"
+              placeholder="Поиск заметок, тегов..."
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              onFocus={handleSearchFocus}
+            />
+          </div>
+          
+          {/* Выпадающее меню поиска */}
+          <SmartSearchDropdown
+            searchQuery={searchQuery}
+            onSearchChange={handleSearchChange}
+            filteredNotes={filteredNotes}
+            tags={tags}
+            groups={groups}
+            selectedTags={selectedTags}
+            onTagToggle={onTagToggle}
+            favoriteOnly={favoriteOnly}
+            setFavoriteOnly={setFavoriteOnly}
+            onNoteSelect={onNoteSelect}
+            isOpen={isSearchDropdownOpen}
+            onClose={() => setIsSearchDropdownOpen(false)}
           />
         </div>
       )}
@@ -84,7 +122,6 @@ const Header = ({
           </div>
         )}
         
-        {/* 👇 ВОТ СЮДА ДОБАВЛЯЕМ children */}
         {children}
         
         <ActionButton 
