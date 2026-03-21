@@ -10,6 +10,13 @@ const StatsTab = ({
   activityData,
   themeClasses
 }) => {
+  // Для отладки
+  console.log('StatsTab received activityData:', activityData);
+  console.log('StatsTab received userStats:', userStats);
+
+  // Находим максимальное значение для масштабирования графика
+  const maxCount = Math.max(...(activityData.map(day => day.count) || [0]), 1);
+
   return (
     <div className="space-y-6">
       {/* Основные метрики */}
@@ -76,46 +83,61 @@ const StatsTab = ({
         </div>
       </div>
 
-      {/* График активности */}
-      {activityData.length > 0 && (
-        <div>
-          <h3 className={`text-lg font-semibold ${themeClasses.colors.text.primary} mb-4 flex items-center`}>
-            <Activity className="w-5 h-5 mr-2 text-indigo-500" />
-            Активность за неделю
-          </h3>
-          <div className={`p-6 rounded-xl ${themeClasses.colors.bg.secondary}`}>
-            <div className="flex items-end justify-between h-32">
-              {activityData.map((day, idx) => (
-                <div key={idx} className="flex flex-col items-center w-1/7">
-                  <div className="relative w-full flex justify-center mb-2 group">
-                    <div 
-                      className="w-8 bg-indigo-500 rounded-t-lg transition-all duration-500 hover:bg-indigo-600 cursor-pointer relative"
-                      style={{ height: `${Math.max(4, day.count * 8)}px` }}
-                    >
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 
-                        px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 
-                        group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                        {day.count} заметок
+      {/* График активности - всегда показываем, даже если нет данных */}
+      <div>
+        <h3 className={`text-lg font-semibold ${themeClasses.colors.text.primary} mb-4 flex items-center`}>
+          <Activity className="w-5 h-5 mr-2 text-indigo-500" />
+          Активность за неделю
+        </h3>
+        <div className={`p-6 rounded-xl ${themeClasses.colors.bg.secondary}`}>
+          {activityData && activityData.length > 0 ? (
+            <>
+              <div className="flex items-end justify-between h-32">
+                {activityData.map((day, idx) => (
+                  <div key={idx} className="flex flex-col items-center w-1/7">
+                    <div className="relative w-full flex justify-center mb-2 group">
+                      <div 
+                        className="w-8 bg-indigo-500 rounded-t-lg transition-all duration-500 hover:bg-indigo-600 cursor-pointer relative"
+                        style={{ 
+                          height: `${Math.max(4, (day.count / maxCount) * 80)}px`,
+                          minHeight: day.count > 0 ? '8px' : '4px'
+                        }}
+                      >
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 
+                          px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 
+                          group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                          {day.count} заметок
+                        </div>
                       </div>
                     </div>
+                    <span className={`text-xs ${themeClasses.colors.text.tertiary}`}>{day.date}</span>
                   </div>
-                  <span className={`text-xs ${themeClasses.colors.text.tertiary}`}>{day.date}</span>
-                </div>
-              ))}
+                ))}
+              </div>
+              
+              <div className="flex justify-between mt-4 text-xs text-gray-400">
+                <span>Пн</span>
+                <span>Вт</span>
+                <span>Ср</span>
+                <span>Чт</span>
+                <span>Пт</span>
+                <span>Сб</span>
+                <span>Вс</span>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8">
+              <Activity className={`w-12 h-12 mx-auto mb-3 ${themeClasses.colors.text.tertiary}`} />
+              <p className={`${themeClasses.colors.text.secondary}`}>
+                Нет данных об активности
+              </p>
+              <p className={`text-sm ${themeClasses.colors.text.tertiary} mt-1`}>
+                Создайте заметки, чтобы увидеть график активности
+              </p>
             </div>
-            
-            <div className="flex justify-between mt-4 text-xs text-gray-400">
-              <span>Пн</span>
-              <span>Вт</span>
-              <span>Ср</span>
-              <span>Чт</span>
-              <span>Пт</span>
-              <span>Сб</span>
-              <span>Вс</span>
-            </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Общая статистика */}
       <div className={`p-4 rounded-xl ${themeClasses.colors.bg.secondary}`}>
