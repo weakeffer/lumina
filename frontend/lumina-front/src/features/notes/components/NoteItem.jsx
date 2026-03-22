@@ -39,6 +39,7 @@ const NoteItem = ({
   };
 
   const handleClick = (e) => {
+    console.log('NoteItem clicked', note.id, isBulkMode);
     if (isBulkMode) {
       onToggleSelection?.(note.id);
     } else {

@@ -6,9 +6,8 @@ import { VIEW_MODES } from '../../features/profile/constants';
 import AppLayout from '../../features/notes/components/AppLayout';
 import NoteSidebar from '../../features/notes/components/NoteSidebar'; 
 import NoteEditor from '../../features/notes/components/NoteEditor';
+import NoteEditorModal from '../../features/notes/components/NoteEditorModel';
 import WelcomeScreen from '../../features/notes/components/WelcomeScreen';
-// Убираем импорт SearchFilters
-// import SearchFilters from '../../features/notes/components/SearchFilters';
 import TagManager from '../../features/notes/components/TagManager';
 import TrashBin from '../../features/notes/components/TrashBin';
 import SettingsPanel from '../../features/notes/components/SettingsPanel';
@@ -158,6 +157,7 @@ const NotesPage = () => {
 
   // Обработчики
   const handleNoteSelect = useCallback((note) => {
+    console.log('handleNoteSelect called', note);
     openNoteModal(note.id, 'view');
     if (isMobile) closeMobileMenu();
   }, [openNoteModal, isMobile, closeMobileMenu]);
@@ -253,6 +253,24 @@ const NotesPage = () => {
   const handleDragEnd = useCallback(() => {
     clearDragState();
   }, [clearDragState]);
+
+  const handleModalSave = useCallback(async (formData) => {
+    if (selectedNote) {
+      // Редактирование существующей заметки
+      await handleNoteUpdate(selectedNote.id, formData);
+    } else {
+      // Создание новой заметки (если модалка открыта без заметки)
+      const newNote = await createNote.mutateAsync({
+        title: formData.title,
+        text: formData.text,
+        group: filters.selectedGroup
+      });
+      // Можно сразу открыть её в режиме редактирования
+      openNoteModal(newNote.id, 'edit');
+      return; // не закрываем модалку, чтобы продолжить редактирование
+    }
+    closeNoteModal();
+  }, [selectedNote, handleNoteUpdate, createNote, filters.selectedGroup, openNoteModal, closeNoteModal]);
 
   const handleDragOver = useCallback((e, groupId) => {
     if (viewMode !== VIEW_MODES.SIDEBAR) return;
@@ -507,6 +525,16 @@ const NotesPage = () => {
           onConfirm={handleConfirmDelete}
           noteTitle={uiState.noteToDelete?.title}
         />
+        {viewMode !== VIEW_MODES.SIDEBAR && uiState.isModalOpen && (
+          <NoteEditorModal
+            isOpen={uiState.isModalOpen}
+            onClose={closeNoteModal}
+            note={selectedNote}
+            onUpdate={handleNoteUpdate}
+            groups={groupsWithNotes}
+            onMoveToGroup={(groupId) => handleMoveNote(selectedNote.id, groupId)}
+          />
+        )}
       </AppLayout>
     </>
   );
