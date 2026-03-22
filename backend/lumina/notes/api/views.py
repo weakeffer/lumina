@@ -3,7 +3,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
-
+from django.conf import settings
+import uuid
+import os
+import base64
 from ..application.service_factory import ServiceFactory
 from ..domain.dto import (
     CreateNoteDTO, UpdateNoteDTO, CreateGroupDTO, UpdateGroupDTO,
@@ -168,6 +171,65 @@ class NotesViewSet(viewsets.ViewSet):
             'message': message,
             'image': image_data
         })
+    
+    @action(detail=False, methods=['post'], url_path='upload-image-base64')
+    def upload_image_base64(self, request):
+        """Загрузка изображения (без привязки к заметке) – возвращает URL"""
+        image_data = request.data.get('image')
+        filename = request.data.get('filename', f'image_{uuid.uuid4()}.jpg')
+
+        if not image_data:
+            return Response(
+                {'error': 'Необходимо передать image'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Проверка размера (5 MB)
+        if len(image_data) > 5 * 1024 * 1024:
+            return Response(
+                {'error': 'Размер файла не должен превышать 5MB'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if ';base64,' not in image_data:
+            return Response(
+                {'error': 'Неверный формат base64 данных'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        format, imgstr = image_data.split(';base64,')
+        ext = format.split('/')[-1]
+
+        allowed_formats = ['jpeg', 'jpg', 'png', 'gif', 'webp', 'svg+xml']
+        if ext not in allowed_formats:
+            return Response(
+                {'error': f'Неподдерживаемый формат. Разрешены: {", ".join(allowed_formats)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Сохраняем файл
+            file_name = f"{uuid.uuid4()}.{ext}"
+            upload_dir = os.path.join(settings.MEDIA_ROOT, 'uploads')
+            os.makedirs(upload_dir, exist_ok=True)
+            file_path = os.path.join(upload_dir, file_name)
+
+            with open(file_path, 'wb') as f:
+                f.write(base64.b64decode(imgstr))
+
+            image_url = f"/media/uploads/{file_name}"
+
+            return Response({
+                'message': 'Изображение загружено',
+                'url': image_url,
+                'filename': filename or file_name
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response(
+                {'error': f'Ошибка при сохранении: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
     
     @action(detail=True, methods=['post'], url_path='remove-image')
     def remove_image(self, request, pk=None):
