@@ -14,7 +14,8 @@ const ProfileSidebar = ({
   themeClasses,
   level,
   getInitials,
-  formatDate
+  formatDate,
+  isOwnProfile = true
 }) => {
   const fileInputRef = useRef(null);
 
@@ -33,7 +34,7 @@ const ProfileSidebar = ({
           
           {/* Градиентная шапка */}
           <div className={`h-32 bg-linear-to-r ${themeClasses.gradient.primary} relative`}>
-            {!editMode && (
+            {!editMode && isOwnProfile && (
               <button
                 onClick={onEditClick}
                 className="absolute top-4 right-4 p-2.5 bg-white/20 backdrop-blur-md 
@@ -65,27 +66,30 @@ const ProfileSidebar = ({
                   )}
                 </div>
                 
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={onAvatarClick}
-                  accept="image/jpeg,image/png,image/gif"
-                  className="hidden"
-                />
-                
-                <button
-                  onClick={handleAvatarClick}
-                  disabled={uploading}
-                  className="absolute bottom-0 right-0 p-2 bg-indigo-500 text-white rounded-full 
-                    hover:bg-indigo-600 transition-all duration-300 transform hover:scale-110
-                    disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-                >
-                  {uploading ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Camera className="w-4 h-4" />
-                  )}
-                </button>
+                {isOwnProfile && (
+                  <>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={onAvatarClick}
+                      accept="image/jpeg,image/png,image/gif"
+                      className="hidden"
+                    />
+                    <button
+                      onClick={handleAvatarClick}
+                      disabled={uploading}
+                      className="absolute bottom-0 right-0 p-2 bg-indigo-500 text-white rounded-full 
+                        hover:bg-indigo-600 transition-all duration-300 transform hover:scale-110
+                        disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                    >
+                      {uploading ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Camera className="w-4 h-4" />
+                      )}
+                    </button>
+                  </>
+                )}
 
                 <div className="absolute bottom-2 left-0 w-3 h-3 bg-green-500 rounded-full ring-2 ring-white"></div>
               </div>
@@ -131,15 +135,17 @@ const ProfileSidebar = ({
 
             {/* Контактная информация */}
             <div className={`space-y-3 p-4 rounded-xl ${themeClasses.colors.bg.secondary} mb-6`}>
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                  <Mail className="w-4 h-4 text-indigo-500" />
+              {isOwnProfile && (
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                    <Mail className="w-4 h-4 text-indigo-500" />
+                  </div>
+                  <div>
+                    <p className={`text-xs ${themeClasses.colors.text.tertiary}`}>Email</p>
+                    <p className={`text-sm font-medium ${themeClasses.colors.text.primary}`}>{user?.email}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className={`text-xs ${themeClasses.colors.text.tertiary}`}>Email</p>
-                  <p className={`text-sm font-medium ${themeClasses.colors.text.primary}`}>{user?.email}</p>
-                </div>
-              </div>
+              )}
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
                   <Calendar className="w-4 h-4 text-green-500" />
@@ -204,17 +210,18 @@ const ProfileSidebar = ({
               </div>
             )}
 
-            {/* Кнопка выхода */}
-            <button
-              onClick={onLogout}
-              className={`w-full py-3 px-4 bg-linear-to-r from-red-500 to-red-600
-                text-white font-semibold rounded-xl hover:from-red-600 hover:to-red-700
-                transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]
-                flex items-center justify-center space-x-2 shadow-lg shadow-red-500/20`}
-            >
-              <LogOut className="w-5 h-5" />
-              <span>Выйти из аккаунта</span>
-            </button>
+            {isOwnProfile && (
+              <button
+                onClick={onLogout}
+                className={`w-full py-3 px-4 bg-linear-to-r from-red-500 to-red-600
+                  text-white font-semibold rounded-xl hover:from-red-600 hover:to-red-700
+                  transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]
+                  flex items-center justify-center space-x-2 shadow-lg shadow-red-500/20`}
+              >
+                <LogOut className="w-5 h-5" />
+                <span>Выйти из аккаунта</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

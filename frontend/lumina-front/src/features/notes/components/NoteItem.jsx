@@ -1,5 +1,6 @@
 import React from 'react';
-import { Star, Trash2, Folder, Calendar, MoreVertical, Pin, Tag } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Star, Trash2, Folder, Calendar, MoreVertical, Pin, Tag, User } from 'lucide-react';
 import { useTheme } from '../../../shared/context/ThemeContext';
 
 const NoteItem = ({ 
@@ -8,7 +9,7 @@ const NoteItem = ({
   onSelect, 
   onDelete, 
   onToggleFavorite,
-  viewMode = 'grid', // 'grid', 'list', 'compact'
+  viewMode = 'grid',
   isSelectedForBulk = false,
   onToggleSelection,
   isBulkMode = false,
@@ -39,7 +40,6 @@ const NoteItem = ({
   };
 
   const handleClick = (e) => {
-    console.log('NoteItem clicked', note.id, isBulkMode);
     if (isBulkMode) {
       onToggleSelection?.(note.id);
     } else {
@@ -170,6 +170,19 @@ const NoteItem = ({
             {note.text || note.content || 'Нет содержимого'}
           </p>
 
+          {note.author_username && (
+            <div className="flex items-center text-xs mb-2">
+              <User className="w-3 h-3 mr-1 text-gray-400" />
+              <Link
+                to={`/profile/${note.author_username}`}
+                onClick={(e) => e.stopPropagation()}
+                className="text-indigo-500 hover:underline"
+              >
+                {note.author_name || note.author_username}
+              </Link>
+            </div>
+          )}
+
           {/* Теги */}
           {note.tags && note.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-2">
@@ -246,6 +259,19 @@ const NoteItem = ({
         </p>
 
         <div className="flex items-center flex-wrap gap-2 text-xs">
+          {note.author_username && (
+            <span className="flex items-center">
+              <User className="w-3 h-3 mr-1 text-gray-400" />
+              <Link
+                to={`/profile/${note.author_username}`}
+                onClick={(e) => e.stopPropagation()}
+                className="text-indigo-500 hover:underline"
+              >
+                {note.author_name || note.author_username}
+              </Link>
+            </span>
+          )}
+
           {/* Группа */}
           <span className={`inline-flex items-center px-2 py-1 rounded-full ${groupColors[groupInfo.color] || groupColors.gray}`}>
             <Folder className="w-3 h-3 mr-1" />

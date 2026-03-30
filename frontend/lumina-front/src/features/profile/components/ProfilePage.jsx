@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
-import { useProfile, useProfileMutations } from '../hooks/useProfile';
+import { useProfile, usePublicProfile, useProfileMutations } from '../hooks/useProfile';
 import { useNotes } from '../../notes/hooks/useNotes';
 import { useProfileStats } from '../hooks/useProfileStats';
 import { useTheme } from '../../../shared/context/ThemeContext';
@@ -32,10 +32,15 @@ const getThemeIcon = (themeId) => {
 };
 
 const ProfilePage = () => {
+  
   const navigate = useNavigate();
+  const { username } = useParams();
+  
+  const isOwnProfile = !username;
+
   const { themeClasses, theme, setTheme } = useTheme();
-  const { 
-    autoSaveInterval, 
+  const {
+    autoSaveInterval,
     setAutoSaveInterval,
     emailNotifications,
     setEmailNotifications,
@@ -52,38 +57,73 @@ const ProfilePage = () => {
   const [formData, setFormData] = useState({});
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
-
-  // Загрузка данных
-  const { data: user, isLoading: profileLoading } = useProfile();
-  const { data: notes = [], isLoading: notesLoading } = useNotes();
-  const { 
-    updateProfile, 
-    uploadAvatar, 
-    logout 
-  } = useProfileMutations();
-
-  // Статистика
-  const { activityData, userStats, formatNoteDate, getUserLevel } = useProfileStats(notes, user);
-
-  // Уровень пользователя
-  const level = useMemo(() => 
-    getUserLevel(user?.total_notes || 0),
-    [user?.total_notes, getUserLevel]
-  );
-
-  // Недавние заметки
-  const recentNotes = useMemo(() => 
-    notes.slice(0, 3),
-    [notes]
-  );
-
   const [viewMode, setViewMode] = useState(() => {
     return localStorage.getItem('viewMode') || 'sidebar';
   });
 
-  // Инициализация формы при загрузке пользователя
+  // Загрузка данных профиля
+  let user = null;
+  let profileLoading = false;
+  
+  if (isOwnProfile) {
+    const result = useProfile({ enabled: isOwnProfile });
+    user = result.data;
+    profileLoading = result.isLoading;
+  } else {
+    const result = usePublicProfile(username, { enabled: !isOwnProfile && !!username });
+    user = result.data;
+    profileLoading = result.isLoading;
+  }
+
+  // Загрузка заметок (только для своего профиля)
+  let notes = [];
+  let notesLoading = false;
+  
+  if (isOwnProfile) {
+    const result = useNotes();
+    notes = result.data || [];
+    notesLoading = result.isLoading;
+  }
+
+  // Мутации профиля
+  const {
+    updateProfile,
+    uploadAvatar,
+    logout
+  } = useProfileMutations();
+
+  // Статистика (вызываем только когда есть user, чтобы избежать ошибок)
+  let activityData = [];
+  let userStats = { streak: 0, totalTags: 0, achievements: 0 };
+  let formatNoteDate = () => '';
+  let getUserLevel = () => ({ label: 'Начинающий', color: 'from-gray-500 to-gray-600' });
+  
+  try {
+    const stats = useProfileStats(
+      isOwnProfile ? notes : [],
+      user
+    );
+    activityData = stats.activityData;
+    userStats = stats.userStats;
+    formatNoteDate = stats.formatNoteDate;
+    getUserLevel = stats.getUserLevel;
+  } catch (error) {
+  }
+
+  // Уровень пользователя
+  const level = useMemo(() =>
+    getUserLevel(user?.total_notes || 0),
+    [user?.total_notes, getUserLevel]
+  );
+
+  const recentNotes = useMemo(() =>
+    isOwnProfile ? notes.slice(0, 3) : [],
+    [isOwnProfile, notes]
+  );
+
+  // Инициализация формы
   useEffect(() => {
-    if (user) {
+    if (isOwnProfile && user?.id) {
       setFormData({
         first_name: user.first_name || '',
         last_name: user.last_name || '',
@@ -97,27 +137,30 @@ const ProfilePage = () => {
         auto_save_interval: user.auto_save_interval || 1
       });
     }
-  }, [user]);
+  }, [isOwnProfile, user?.id]);
 
   // Проверка авторизации
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/login');
+    if (isOwnProfile) {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+      }
     }
-  }, [navigate]);
+  }, [isOwnProfile, navigate]);
 
-  // Обработчики
   const handleLogout = useCallback(async () => {
+    if (!isOwnProfile) return;
     try {
       await logout.mutateAsync();
       navigate('/login');
     } catch (error) {
       console.error('Logout error:', error);
     }
-  }, [logout, navigate]);
+  }, [isOwnProfile, logout, navigate]);
 
   const handleAvatarUpload = useCallback(async (e) => {
+    if (!isOwnProfile) return;
     const file = e.target.files[0];
     if (!file) return;
 
@@ -140,13 +183,14 @@ const ProfilePage = () => {
     } finally {
       setUploading(false);
     }
-  }, [uploadAvatar]);
+  }, [isOwnProfile, uploadAvatar]);
 
   const handleSave = useCallback(async () => {
+    if (!isOwnProfile) return;
     try {
       await updateProfile.mutateAsync(formData);
       setEditMode(false);
-      
+
       if (formData.theme_preference && formData.theme_preference !== theme) {
         setTheme(formData.theme_preference);
       }
@@ -154,7 +198,7 @@ const ProfilePage = () => {
       console.error('Profile update error:', error);
       alert('Ошибка при обновлении профиля');
     }
-  }, [formData, theme, updateProfile, setTheme]);
+  }, [isOwnProfile, formData, theme, updateProfile, setTheme]);
 
   const handleInputChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
@@ -170,6 +214,7 @@ const ProfilePage = () => {
   }, [setTheme]);
 
   const handleExportData = useCallback(() => {
+    if (!isOwnProfile) return;
     const settings = exportSettings();
     const dataToExport = {
       user: {
@@ -185,7 +230,7 @@ const ProfilePage = () => {
       settings: settings,
       exportDate: new Date().toISOString()
     };
-    
+
     const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -193,12 +238,13 @@ const ProfilePage = () => {
     a.download = `lumina-backup-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [user, exportSettings]);
+  }, [isOwnProfile, user, exportSettings]);
 
   const handleImportData = useCallback((e) => {
+    if (!isOwnProfile) return;
     const file = e.target.files[0];
     if (!file) return;
-    
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -212,11 +258,13 @@ const ProfilePage = () => {
       }
     };
     reader.readAsText(file);
-  }, [importSettings]);
+  }, [isOwnProfile, importSettings]);
 
   const handleNoteClick = useCallback((noteId) => {
-    navigate(`/notes/${noteId}`);
-  }, [navigate]);
+    if (isOwnProfile) {
+      navigate(`/notes/${noteId}`);
+    }
+  }, [isOwnProfile, navigate]);
 
   const loading = profileLoading || notesLoading;
 
@@ -227,12 +275,27 @@ const ProfilePage = () => {
           <div className="relative">
             <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           </div>
-          <p className={`${themeClasses.colors.text.tertiary} animate-pulse`}>Загрузка профиля...</p>
+          <p className={`${themeClasses.colors.text.tertiary} animate-pulse`}>
+            {isOwnProfile ? 'Загрузка профиля...' : `Загрузка профиля ${username}...`}
+          </p>
         </div>
       </div>
     );
   }
 
+  if (!user) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${themeClasses.colors.bg.primary}`}>
+        <div className="text-center">
+          <p className={`text-xl ${themeClasses.colors.text.primary} mb-2`}>Пользователь не найден</p>
+          <p className={`text-sm ${themeClasses.colors.text.secondary}`}>
+            Проверьте правильность имени пользователя
+          </p>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className={`min-h-screen ${themeClasses.colors.bg.primary} relative overflow-hidden flex`}>
       {/* Декоративные элементы */}
@@ -253,6 +316,7 @@ const ProfilePage = () => {
         level={level}
         getInitials={() => getInitials(user)}
         formatDate={formatNoteDate}
+        isOwnProfile={isOwnProfile}
       />
 
       {/* Правая колонка - Основной контент */}
@@ -261,7 +325,7 @@ const ProfilePage = () => {
           {/* Кнопка назад */}
           <button
             onClick={() => navigate('/notes')}
-            className={`group flex items-center space-x-2 mb-6 px-4 py-2 rounded-xl 
+            className={`group flex items-center space-x-2 mb-6 px-4 py-2 rounded-xl
               ${themeClasses.colors.bg.secondary} ${themeClasses.colors.text.secondary}
               hover:${themeClasses.colors.bg.tertiary} transition-all duration-300
               border ${themeClasses.colors.border.primary} backdrop-blur-sm`}
@@ -273,10 +337,12 @@ const ProfilePage = () => {
           {/* Верхняя панель с приветствием */}
           <div className="mb-8">
             <h1 className={`text-4xl font-bold ${themeClasses.colors.text.primary} mb-2`}>
-              Профиль
+              {isOwnProfile ? 'Профиль' : `Профиль ${user.username}`}
             </h1>
             <p className={`text-lg ${themeClasses.colors.text.secondary}`}>
-              Управляйте своим аккаунтом и настройками
+              {isOwnProfile
+                ? 'Управляйте своим аккаунтом и настройками'
+                : `Статистика и публичная информация пользователя ${user.username}`}
             </p>
           </div>
 
@@ -285,16 +351,17 @@ const ProfilePage = () => {
             activeTab={activeTab}
             onTabChange={setActiveTab}
             themeClasses={themeClasses}
+            isOwnProfile={isOwnProfile}
           />
 
           {/* Контент табов */}
-          <div className={`rounded-2xl ${themeClasses.colors.card.bg} 
+          <div className={`rounded-2xl ${themeClasses.colors.card.bg}
             border ${themeClasses.colors.border.primary} p-6 backdrop-blur-sm
             shadow-xl`}>
-            
+
             {activeTab === 'profile' && (
               <ProfileTab
-                editMode={editMode}
+                editMode={editMode && isOwnProfile}
                 formData={formData}
                 user={user}
                 recentNotes={recentNotes}
@@ -319,6 +386,7 @@ const ProfilePage = () => {
                 onNoteClick={handleNoteClick}
                 themeClasses={themeClasses}
                 formatNoteDate={formatNoteDate}
+                isOwnProfile={isOwnProfile}
               />
             )}
 
@@ -326,12 +394,13 @@ const ProfilePage = () => {
               <StatsTab
                 user={user}
                 userStats={userStats}
-                activityData={activityData}
+                activityData={isOwnProfile ? activityData : []}
                 themeClasses={themeClasses}
+                isOwnProfile={isOwnProfile}
               />
             )}
 
-            {activeTab === 'settings' && (
+            {isOwnProfile && activeTab === 'settings' && (
               <SettingsTab
                 formData={formData}
                 emailNotifications={emailNotifications}

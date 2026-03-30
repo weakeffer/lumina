@@ -8,6 +8,7 @@ from ..application.service_factory import ServiceFactory
 from ..domain.dto import RegisterDTO, LoginDTO, UpdateProfileDTO
 
 class UserViewSet(viewsets.ViewSet):
+    lookup_field = 'username'
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.auth_service = ServiceFactory.get_auth_service()
@@ -16,7 +17,19 @@ class UserViewSet(viewsets.ViewSet):
     def get_permissions(self):
         if self.action in ['register', 'login']:
             return [permissions.AllowAny()]
+        if self.action == 'retrieve':
+            return[permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
+    
+    def retrieve(self, request, username=None):
+        public_profile = self.profile_service.get_public_profile_by_username(username)
+        if not public_profile:
+            return Response(
+                {'error': 'Пользователь не найден'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        # сериализуем DTO в словарь
+        return Response(public_profile.__dict__)
     
     @action(detail=False, methods=['post'], url_path='register')
     def register(self, request):

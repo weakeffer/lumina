@@ -1,7 +1,5 @@
-// frontend/lumina-front/src/app/App.jsx
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-// Импорты из shared/context
 import { ThemeProvider } from '../shared/context/ThemeContext';
 import { SettingsProvider } from '../shared/context/SettingsContext';
 import { ViewModeProvider } from '../shared/context/ViewModeContext';
@@ -10,11 +8,9 @@ import Login from '../pages/auth/Login';
 import Register from '../pages/auth/Register';
 import AuthLayout from '../pages/auth/AuthLayout';
 
-// Импортируем страницы
 import NotesPage from '../pages/notes/NotesPage';
-import ProfilePage from '../features/profile/components/ProfilePage'; // Исправленный импорт
+import ProfilePage from '../features/profile/components/ProfilePage';
 
-// Компонент для защиты маршрутов
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   return token ? children : <Navigate to="/login" />;
@@ -27,13 +23,11 @@ function App() {
         <ViewModeProvider>
           <BrowserRouter>
             <Routes>
-              {/* Auth routes */}
               <Route element={<AuthLayout />}>
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
               </Route>
 
-              {/* Protected routes */}
               <Route
                 path="/"
                 element={
@@ -60,8 +54,14 @@ function App() {
                   </PrivateRoute>
                 }
               />
-
-              {/* Redirect to notes if route not found */}
+              <Route
+                path="/profile/:username"
+                element={
+                  <PrivateRoute>
+                    <ProfilePage />
+                  </PrivateRoute>
+                }
+              />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </BrowserRouter>

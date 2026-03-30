@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 
 export const useProfileStats = (notes = [], user = null) => {
   const [activityData, setActivityData] = useState([]);
@@ -7,26 +7,25 @@ export const useProfileStats = (notes = [], user = null) => {
     totalTags: 0,
     achievements: 0
   });
+  
+  const prevNotesRef = useRef(null);
+  const prevStatsRef = useRef(null);
 
   // Функция для безопасного парсинга даты
   const parseNoteDate = (dateString) => {
     if (!dateString) return null;
     
     try {
-      // Если это уже объект Date
       if (dateString instanceof Date) {
         return dateString;
       }
       
-      // Если строка
       if (typeof dateString === 'string') {
-        // Формат ISO: "2026-03-21T23:30:38.123Z"
         if (dateString.includes('T')) {
           const date = new Date(dateString);
           if (!isNaN(date.getTime())) return date;
         }
         
-        // Формат с точками: "21.03.2026 23:30:38"
         if (dateString.includes('.')) {
           const parts = dateString.split(' ');
           const dateParts = parts[0].split('.');
@@ -45,14 +44,12 @@ export const useProfileStats = (notes = [], user = null) => {
           }
         }
         
-        // Формат с дефисами: "2026-03-21"
         if (dateString.includes('-')) {
           const date = new Date(dateString);
           if (!isNaN(date.getTime())) return date;
         }
       }
       
-      // Пробуем стандартный парсинг
       const date = new Date(dateString);
       if (!isNaN(date.getTime())) return date;
       
@@ -63,17 +60,13 @@ export const useProfileStats = (notes = [], user = null) => {
     }
   };
 
-  useEffect(() => {
-    console.log('useProfileStats: computing stats for notes:', notes?.length || 0);
-    
-    // Создаем данные для последних 7 дней
+  const calculatedStats = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
     const days = [];
     const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
     
-    // Создаем массив последних 7 дней
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
@@ -93,11 +86,9 @@ export const useProfileStats = (notes = [], user = null) => {
         const noteDate = parseNoteDate(note.created_at);
         if (!noteDate) return;
         
-        // Приводим дату заметки к началу дня
         const noteDay = new Date(noteDate);
         noteDay.setHours(0, 0, 0, 0);
         
-        // Ищем соответствующий день в нашем массиве
         const dayIndex = days.findIndex(day => 
           day.date.getTime() === noteDay.getTime()
         );
@@ -114,15 +105,10 @@ export const useProfileStats = (notes = [], user = null) => {
       fullDate: day.fullDate,
       count: day.count
     }));
-    
-    console.log('Formatted activity data:', formattedActivity);
-    setActivityData(formattedActivity);
-    
-    // Подсчет стрика (непрерывной активности)
+
     let currentStreak = 0;
     let maxStreak = 0;
     
-    // Проверяем дни с сегодняшнего в обратном порядке
     for (let i = days.length - 1; i >= 0; i--) {
       if (days[i].count > 0) {
         currentStreak++;
@@ -144,19 +130,36 @@ export const useProfileStats = (notes = [], user = null) => {
       }
     });
     
-    console.log('User stats:', {
-      streak: currentStreak,
-      totalTags: allTags.size,
-      achievements: Math.floor(maxStreak / 7)
-    });
-    
-    setUserStats({
-      streak: currentStreak,
-      totalTags: allTags.size,
-      achievements: Math.floor(maxStreak / 7)
-    });
-    
-  }, [notes]); // Зависимость от notes
+    return {
+      activityData: formattedActivity,
+      userStats: {
+        streak: currentStreak,
+        totalTags: allTags.size,
+        achievements: Math.floor(maxStreak / 7)
+      }
+    };
+  }, [notes]);
+
+  useEffect(() => {
+    if (prevNotesRef.current !== notes) {
+      prevNotesRef.current = notes;
+      
+      const activityChanged = JSON.stringify(prevStatsRef.current?.activityData) !== JSON.stringify(calculatedStats.activityData);
+      const statsChanged = JSON.stringify(prevStatsRef.current?.userStats) !== JSON.stringify(calculatedStats.userStats);
+      
+      if (activityChanged) {
+        setActivityData(calculatedStats.activityData);
+      }
+      if (statsChanged) {
+        setUserStats(calculatedStats.userStats);
+      }
+      
+      prevStatsRef.current = {
+        activityData: calculatedStats.activityData,
+        userStats: calculatedStats.userStats
+      };
+    }
+  }, [calculatedStats, notes]);
 
   const formatNoteDate = (dateString) => {
     const date = parseNoteDate(dateString);

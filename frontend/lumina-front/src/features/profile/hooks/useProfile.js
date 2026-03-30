@@ -18,6 +18,18 @@ export const useProfile = (options = {}) => {
   });
 };
 
+export const usePublicProfile = (username, options = {}) => {
+  return useQuery({
+    queryKey: ['publicProfile', username],
+    queryFn: () => profileApi.getPublicProfile(username),
+    enabled: !!username,
+    staleTime: 5 * 60 * 1000,
+    cacheTime: 10 * 60 * 1000,
+    retry: 1,
+    ...options
+  });
+};
+
 export const useProfileMutations = () => {
   const queryClient = useQueryClient();
 

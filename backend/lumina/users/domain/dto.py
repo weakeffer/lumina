@@ -5,6 +5,40 @@ import pytz
 from .entities import UserEntity, ProfileEntity
 
 @dataclass
+class PublicUserDTO:
+    id: int
+    username: str
+    first_name: str = ""
+    last_name: str = ""
+    avatar_url: Optional[str] = None
+    bio: str = ""
+    telegram: str = ""
+    github: str = ""
+    website: str = ""
+    total_notes: int = 0
+    total_words: int = 0
+    joined_date: Optional[str] = None
+    last_login: Optional[str] = None
+
+    @classmethod
+    def from_entity(cls, user: UserEntity, profile: ProfileEntity) -> 'PublicUserDTO':
+        return cls(
+            id=user.id,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            avatar_url=profile.avatar_url if profile else None,
+            bio=profile.bio if profile else "",
+            telegram=profile.telegram if profile else "",
+            github=profile.github if profile else "",
+            website=profile.website if profile else "",
+            total_notes=profile.total_notes if profile else 0,
+            total_words=profile.total_words if profile else 0,
+            joined_date=user.date_joined.strftime('%Y-%m-%d') if user.date_joined else None,
+            last_login=user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else None
+        )
+
+@dataclass
 class ProfileDTO:
     id: int
     user_id: int

@@ -1,12 +1,14 @@
 import React from 'react';
 import { User, TrendingUp, Settings } from 'lucide-react';
 
-const ProfileTabs = ({ activeTab, onTabChange, themeClasses }) => {
+const ProfileTabs = ({ activeTab, onTabChange, themeClasses, isOwnProfile = true }) => {
   const tabs = [
     { id: 'profile', icon: User, label: 'Профиль' },
     { id: 'stats', icon: TrendingUp, label: 'Статистика' },
-    { id: 'settings', icon: Settings, label: 'Настройки' }
   ];
+  if (isOwnProfile) {
+    tabs.push({ id: 'settings', icon: Settings, label: 'Настройки' });
+  }
 
   return (
     <div className={`flex space-x-1 p-1 rounded-2xl ${themeClasses.colors.bg.secondary} 

@@ -12,9 +12,10 @@ const ProfileTab = ({
   onCancel,
   onNoteClick,
   themeClasses,
-  formatNoteDate
+  formatNoteDate,
+  isOwnProfile = true
 }) => {
-  if (editMode) {
+  if (editMode && isOwnProfile) {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -162,8 +163,7 @@ const ProfileTab = ({
         </div>
       )}
 
-      {/* Недавние заметки */}
-      {recentNotes.length > 0 && (
+      {isOwnProfile && recentNotes.length > 0 && (
         <div>
           <h3 className={`text-lg font-semibold ${themeClasses.colors.text.primary} mb-3 flex items-center`}>
             <Zap className="w-5 h-5 mr-2 text-indigo-500" />

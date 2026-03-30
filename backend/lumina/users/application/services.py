@@ -7,7 +7,7 @@ from ..domain.entities import UserEntity, ProfileEntity
 from ..domain.interfaces import UserRepository, ProfileRepository
 from ..domain.dto import (
     RegisterDTO, LoginDTO, UpdateProfileDTO,
-    UserDTO, ProfileDTO, TokenDTO, StatisticsDTO
+    UserDTO, ProfileDTO, TokenDTO, StatisticsDTO, PublicUserDTO
 )
 
 class AuthService:
@@ -97,6 +97,17 @@ class ProfileService:
         
         profile_dto = ProfileDTO.from_entity(profile, profile.avatar_url)
         return UserDTO.from_entity(user, profile_dto)
+    
+    def get_public_profile_by_username(self, username: str) -> Optional[PublicUserDTO]:
+        user = self.user_repository.get_by_username(username)
+        if not user:
+            return None
+
+        profile = self.profile_repository.get_by_user_id(user.id)
+        if not profile:
+            return None
+
+        return PublicUserDTO.from_entity(user, profile)
     
     def update_profile(self, user_id: int, dto: UpdateProfileDTO) -> Tuple[Optional[UserDTO], List[str]]:
         errors = dto.validate()

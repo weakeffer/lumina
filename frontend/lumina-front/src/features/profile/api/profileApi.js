@@ -27,6 +27,28 @@ export const profileApi = {
     }
   },
 
+  getPublicProfile: async (username) => {
+    try {
+      const response = await fetch(`${API_URL}/api/users/${username}/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Ошибка получения профиля');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Public profile API error:', error);
+      throw error;
+    }
+  },
+
   updateProfile: async (profileData) => {
     try {
       const response = await fetch(`${API_URL}/api/users/profile/`, {
