@@ -25,12 +25,16 @@ import Header from '../../features/notes/components/Common/Header';
 import Footer from '../../features/notes/components/Common/Footer';
 import Notification from '../../features/notes/components/Common/Notification';
 import ViewModeToggle from '../../shared/ui/ViewModeToggle';
+import ContextMenu from "../../shared/ui/ContextMenu";
+import { useContextMenu } from "../../shared/lib/hooks/useContextMenu";
+import { getEmptyMenuItems } from "../../features/notes/config/contextMenuConfig.jsx";
 
 const NotesPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { themeClasses, isMobile, theme, setTheme } = useTheme();
   const { viewMode, changeViewMode } = useViewMode();
+  const { menuState, showMenu, hideMenu } = useContextMenu();
   
   // Данные
   const { data: notes = [], isLoading: notesLoading } = useNotes();
@@ -64,7 +68,7 @@ const NotesPage = () => {
     closeMobileMenu,
     toggleStatistics,
     toggleSettings,
-    toggleSearchFilters, // Убираем вызовы этого, но пока оставим для совместимости
+    toggleSearchFilters,
     toggleTagManager,
     toggleTrash,
     toggleGroupManager,
@@ -175,6 +179,35 @@ const NotesPage = () => {
       showNotification('Ошибка при создании заметки', 'error');
     }
   }, [createNote, filters.selectedGroup, openNoteModal, showNotification]);
+
+  const handleEmptyContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const menuItems = getEmptyMenuItems({
+      onCreateNote: () => {
+        handleNoteCreate();
+      },
+      onCreateGroup: () => {
+        toggleGroupManager();
+      },
+      onImport: () => {
+        console.log('Импорт');
+      },
+      onSync: () => {
+        console.log('Синхронизация');
+      },
+      onToggleViewMode: (mode) => {
+        changeViewMode(mode);
+      },
+      currentViewMode: viewMode,
+      onSortBy: (sortBy) => {
+        console.log('Сортировка по:', sortBy);
+      }
+    });
+    
+    showMenu(e, 'empty', { menuItems });
+  };
 
   const handleNoteUpdate = useCallback(async (id, updates) => {
     try {
@@ -333,6 +366,7 @@ const NotesPage = () => {
   }
 
   return (
+    <div onContextMenu={handleEmptyContextMenu}>
     <>
       <Notification 
         notification={uiState.notification} 
@@ -535,8 +569,18 @@ const NotesPage = () => {
             onMoveToGroup={(groupId) => handleMoveNote(selectedNote.id, groupId)}
           />
         )}
+        {menuState.visible && (
+          <ContextMenu
+            x={menuState.x}
+            y={menuState.y}
+            items={menuState.data?.menuItems || []}
+            onClose={hideMenu}
+            contextType={menuState.contextType}
+          />
+        )}
       </AppLayout>
     </>
+    </div>
   );
 };
 

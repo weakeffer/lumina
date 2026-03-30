@@ -16,6 +16,8 @@ import {
   Tag
 } from "lucide-react";
 import { useTheme } from '../../../shared/context/ThemeContext';
+import { useContextMenu } from '../../../shared/lib/hooks/useContextMenu';
+import { getNoteMenuItems } from '../config/contextMenuConfig.jsx';
 
 const NoteSidebar = ({
   groupedNotes,
@@ -47,6 +49,7 @@ const NoteSidebar = ({
   const [expandedGroups, setExpandedGroups] = useState(["all"]);
   const [isHovering, setIsHovering] = useState(false);
 
+
   // Автоматически раскрывать группу при выборе
   useEffect(() => {
     if (selectedGroup && !expandedGroups.includes(selectedGroup)) {
@@ -60,6 +63,37 @@ const NoteSidebar = ({
         ? prev.filter(g => g !== id)
         : [...prev, id]
     );
+  };
+
+  const handleGroupContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const menuItems = getGroupMenuItems({
+      group,
+      onRename: () => {
+        // Открыть модалку переименования
+        console.log('Rename group:', group);
+      },
+      onChangeColor: (groupId, color) => {
+        // Изменить цвет группы
+        console.log('Change color:', groupId, color);
+      },
+      onCreateNoteInGroup: (groupId) => {
+        // Создать заметку в группе
+        onCreateNote?.(groupId);
+      },
+      onMoveNotes: () => {
+        // Переместить заметки в группу
+        console.log('Move notes to group:', group);
+      },
+      onDelete: () => {
+        // Удалить группу
+        console.log('Delete group:', group.id);
+      }
+    });
+
+    showMenu(e, 'group', { group, menuItems });
   };
 
   // Системные группы
@@ -379,35 +413,6 @@ const NoteSidebar = ({
               </SidebarSection>
             )}
 
-            {/* Заметки без группы */}
-            {noGroupNotes.length > 0 && (
-              <SidebarSection title="Без группы">
-                <SidebarGroup
-                  group={{
-                    id: "none",
-                    name: "Без группы",
-                    icon: FileText,
-                    notes_count: noGroupNotesCount
-                  }}
-                  notes={noGroupNotes}
-                  selectedGroup={selectedGroup}
-                  expandedGroups={expandedGroups}
-                  toggleGroup={toggleGroup}
-                  onGroupSelect={onGroupSelect}
-                  selectedNote={selectedNote}
-                  onNoteSelect={onNoteSelect}
-                  onNoteDelete={onNoteDelete}
-                  onToggleFavorite={onToggleFavorite}
-                  onMoveNoteToGroup={onMoveNoteToGroup}
-                  onDragStart={onDragStart}
-                  onDragEnd={onDragEnd}
-                  onDragOver={onDragOver}
-                  onDrop={onDrop}
-                  dragOverGroup={dragOverGroup}
-                  favorites={favorites}
-                />
-              </SidebarSection>
-            )}
           </div>
         )}
       </aside>
@@ -428,6 +433,8 @@ const SidebarSection = ({ title, children }) => {
 };
 
 // Компонент группы в сайдбаре
+// В NoteSidebar.jsx, найдите компонент SidebarGroup и замените его на этот:
+
 const SidebarGroup = ({
   group,
   notes = [],
@@ -445,7 +452,12 @@ const SidebarGroup = ({
   onDragOver,
   onDrop,
   dragOverGroup,
-  favorites = []
+  favorites = [],
+  // Добавляем новые пропсы с значениями по умолчанию
+  onRenameGroup = () => {},
+  onChangeGroupColor = () => {},
+  onDeleteGroup = () => {},
+  onCreateNoteInGroup = () => {}
 }) => {
   const isExpanded = expandedGroups.includes(group.id);
   const isActive = String(selectedGroup) === String(group.id);
@@ -454,18 +466,57 @@ const SidebarGroup = ({
     ? group.notes_count 
     : notes.length;
 
+  // Хук должен быть здесь, до return
+  const { showMenu } = useContextMenu();
+
+  // Обработчик контекстного меню для группы
+  const handleGroupContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const menuItems = getGroupMenuItems({
+      group,
+      onRename: () => {
+        if (onRenameGroup) {
+          onRenameGroup(group.id);
+        }
+      },
+      onChangeColor: (groupId, color) => {
+        if (onChangeGroupColor) {
+          onChangeGroupColor(groupId, color);
+        }
+      },
+      onCreateNoteInGroup: (groupId) => {
+        if (onCreateNoteInGroup) {
+          onCreateNoteInGroup(groupId);
+        }
+      },
+      onMoveNotes: () => {
+        console.log('Переместить заметки в группу:', group.id);
+      },
+      onDelete: () => {
+        if (onDeleteGroup) {
+          onDeleteGroup(group.id);
+        }
+      }
+    });
+    
+    showMenu(e, 'group', { menuItems });
+  };
+
   return (
     <div>
       {/* Заголовок группы */}
       <div
         className={`
-        flex items-center gap-2 px-4 py-2 cursor-pointer
-        ${isActive ? "bg-indigo-50 dark:bg-indigo-900/20" : ""}
-        hover:bg-gray-50 dark:hover:bg-gray-800
-        ${dragOverGroup === group.id ? "ring-2 ring-indigo-500" : ""}
-        transition-colors
-      `}
+          group-item flex items-center gap-2 px-4 py-2 cursor-pointer
+          ${isActive ? "bg-indigo-50 dark:bg-indigo-900/20" : ""}
+          hover:bg-gray-50 dark:hover:bg-gray-800
+          ${dragOverGroup === group.id ? "ring-2 ring-indigo-500" : ""}
+          transition-colors
+        `}
         onClick={() => onGroupSelect(group.id)}
+        onContextMenu={handleGroupContextMenu}
         onDragOver={(e) => onDragOver?.(e, group.id)}
         onDrop={(e) => onDrop?.(e, group.id)}
       >

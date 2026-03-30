@@ -2,6 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Star, Trash2, Folder, Calendar, MoreVertical, Pin, Tag, User } from 'lucide-react';
 import { useTheme } from '../../../shared/context/ThemeContext';
+import { useContextMenu } from '../../../shared/lib/hooks/useContextMenu';
+import { getNoteMenuItems } from '../config/contextMenuConfig.jsx';
 
 const NoteItem = ({ 
   note, 
@@ -13,9 +15,10 @@ const NoteItem = ({
   isSelectedForBulk = false,
   onToggleSelection,
   isBulkMode = false,
-  groups = []
+  groups = [],
 }) => {
   const { themeClasses } = useTheme();
+  const { showMenu, hideMenu, menuState } = useContextMenu();
 
   const getGroupInfo = () => {
     const groupId = note.group || note.group_id;
@@ -47,6 +50,41 @@ const NoteItem = ({
     }
   };
 
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    console.log('Context menu triggered!');
+    e.stopPropagation();
+    
+    const menuItems = getNoteMenuItems({
+      note,
+      isFavorite: note.isFavorite,
+      onToggleFavorite: () => onToggleFavorite(note.id),
+      onEdit: () => onSelect(note),
+      onDelete: () => onDelete(note.id),
+      onMoveToGroup: (noteId, groupId) => {
+        // Функция перемещения в группу
+        console.log('Move to group:', noteId, groupId);
+      },
+      onAddTag: (noteId, tagId) => {
+        // Функция добавления тега
+        console.log('Add tag:', noteId, tagId);
+      },
+      onDuplicate: () => {
+        // Функция дублирования
+        console.log('Duplicate:', note.id);
+      },
+      onCopyLink: () => {
+        navigator.clipboard.writeText(`${window.location.origin}/notes/${note.id}`);
+      },
+      onArchive: () => {
+        // Функция архивирования
+        console.log('Archive:', note.id);
+      }
+    });
+
+    showMenu(e, 'note', { note, menuItems });
+  };
+
   const handleFavoriteClick = (e) => {
     e.stopPropagation();
     onToggleFavorite(note.id);
@@ -66,6 +104,7 @@ const NoteItem = ({
   if (viewMode === 'compact') {
     return (
       <div
+        onContextMenu={handleContextMenu}
         onClick={handleClick}
         className={`
           group flex items-center px-2 py-1.5 rounded-md cursor-pointer
