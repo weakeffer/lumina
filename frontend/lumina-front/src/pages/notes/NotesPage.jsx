@@ -50,6 +50,8 @@ const NotesPage = () => {
     softDeleteNote,
     restoreNote,
     moveNoteToGroup,
+    permanentDeleteNote,
+    emptyTrash,
   } = useNoteMutations();
   
   const {
@@ -274,6 +276,22 @@ const NotesPage = () => {
       showNotification('Ошибка при восстановлении', 'error');
     }
   }, [restoreNote, showNotification]);
+
+  const handleEmptyTrash = useCallback(async () => {
+    console.log('🔄 handleEmptyTrash вызван');
+    console.log('emptyTrash объект:', emptyTrash);
+    
+    try {
+        console.log('📡 Вызов emptyTrash.mutateAsync()');
+        const result = await emptyTrash.mutateAsync();
+        console.log('✅ Результат:', result);
+        showNotification('Корзина очищена', 'success');
+        toggleTrash();
+    } catch (error) {
+        console.error('❌ Ошибка:', error);
+        showNotification('Ошибка при очистке корзины', 'error');
+    }
+  }, [emptyTrash, showNotification, toggleTrash]);
 
   // Drag & Drop (только для sidebar режима)
   const handleDragStart = useCallback((e, note) => {
@@ -517,8 +535,8 @@ const NotesPage = () => {
           <TrashBin
             deletedNotes={trashNotes}
             onRestore={handleRestoreNote}
-            onDeletePermanently={(id) => console.log('permanent delete', id)}
-            onEmpty={() => console.log('empty trash')}
+            onDeletePermanently={permanentDeleteNote.mutate}
+            onEmpty={handleEmptyTrash}
             onClose={toggleTrash}
             loading={notesLoading}
           />

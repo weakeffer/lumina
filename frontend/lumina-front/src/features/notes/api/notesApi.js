@@ -140,6 +140,16 @@ export const notesApi = {
     }
   },
 
+  emptyTrash: async () => {
+    try {
+      const result = await api.emptyTrash();
+      return result;
+    } catch (error) {
+      console.error('notesApi.emptyTrash error:', error);
+      throw error;
+    }
+  },
+
   moveToGroup: async (noteId, groupId) => {
     try {
       const result = await api.moveNoteToGroup(noteId, groupId);

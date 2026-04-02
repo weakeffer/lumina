@@ -126,6 +126,17 @@ export const useNoteMutations = () => {
     }
   });
 
+  const emptyTrash = useMutation({
+    mutationFn: notesApi.emptyTrash,
+    onSuccess: () => {
+        invalidateNotesLists();
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notes.trash });
+    },
+    onError: (error) => {
+        console.error('Empty trash error:', error);
+    }
+});
+
   const moveNoteToGroup = useMutation({
     mutationFn: ({ noteId, groupId }) => 
       notesApi.moveToGroup(noteId, groupId),
@@ -159,6 +170,7 @@ export const useNoteMutations = () => {
     softDeleteNote,
     permanentDeleteNote,
     restoreNote,
+    emptyTrash,
     moveNoteToGroup
   };
 };
