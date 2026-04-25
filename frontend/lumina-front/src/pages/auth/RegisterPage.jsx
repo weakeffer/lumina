@@ -5,7 +5,7 @@ import { api } from '../../shared/api/api';
 import AuthLayout from './AuthLayout';
 import Input from '../../components/ui/Input';
 
-const Register = () => {
+const RegisterPage = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -279,4 +279,4 @@ const Register = () => {
   );
 };
 
-export default Register;
+export default RegisterPage;

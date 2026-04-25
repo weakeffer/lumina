@@ -956,4 +956,11 @@ export const api = {
         });
         return response.json();
     },
+    async getPersonalityProfile() {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/api/notes/personality-profile/`, {
+            headers: { 'Authorization': `Token ${token}` },
+        });
+        return response.json();
+    },
 };

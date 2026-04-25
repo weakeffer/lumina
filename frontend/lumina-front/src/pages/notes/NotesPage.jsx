@@ -14,6 +14,7 @@ import SettingsPanel from '../../features/notes/components/SettingsPanel';
 import GroupManager from '../../features/notes/components/GroupManager';
 import MiniStatistics from '../../features/notes/components/MiniStatistics';
 import DeleteConfirmModal from '../../features/notes/components/DeleteConfirmModal';
+import PersonalityProfile from '../../features/notes/components/PersonalityProfile';
 import { useNotes, useTrashNotes, useNotesByGroups } from '../../features/notes/hooks/useNotes';
 import { useNoteMutations } from '../../features/notes/hooks/useNoteMutations';
 import { useGroupsWithNotes, useGroupMutations } from '../../features/notes/hooks/useGroups';
@@ -29,7 +30,7 @@ import ContextMenu from "../../shared/ui/ContextMenu";
 import { useContextMenu } from "../../shared/lib/hooks/useContextMenu";
 import { getEmptyMenuItems } from "../../features/notes/config/contextMenuConfig.jsx";
 import DailySummary from '../../features/notes/components/DailySummary';
-import { Brain } from 'lucide-react';
+import { Brain, Star } from 'lucide-react';
 import ActionButton from '../../features/notes/components/ActionButton.jsx';
 
 const NotesPage = () => {
@@ -464,6 +465,11 @@ const NotesPage = () => {
               onClick={() => updateUI({ isDailySummaryOpen: true })}
               tooltip="Сводка дня"
             />
+            <ActionButton
+                icon={Star}   // import { Star } from 'lucide-react'
+                onClick={() => updateUI({ isPersonalityOpen: true })}
+                tooltip="Карта личности"
+            />
           </Header>
         }
         footer={
@@ -543,7 +549,10 @@ const NotesPage = () => {
         {uiState.isDailySummaryOpen && (
           <DailySummary onClose={() => updateUI({ isDailySummaryOpen: false })} />
         )}
-
+        {uiState.isPersonalityOpen && (
+            <PersonalityProfile onClose={() => updateUI({ isPersonalityOpen: false })} />
+        )}
+        
         {uiState.isTrashOpen && (
           <TrashBin
             deletedNotes={trashNotes}

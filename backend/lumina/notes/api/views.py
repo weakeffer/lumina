@@ -346,6 +346,13 @@ class NotesViewSet(viewsets.ViewSet):
             analyze_note_async(note.id)
 
         return Response({'message': f'Запущен анализ {notes.count()} заметок'})
+    
+    @action(detail=False, methods=['get'], url_path='personality-profile')
+    def personality_profile(self, request):
+        """Полный психологический профиль пользователя"""
+        from ..nlp.profile_service import get_personality_profile
+        profile = get_personality_profile(request.user.id)
+        return Response(profile)
 
 
 class NoteGroupViewSet(viewsets.ViewSet):

@@ -5,7 +5,7 @@ import AuthLayout from './AuthLayout';
 import Input from '../../components/ui/Input';
 import { api } from '../../shared/api/api';
 
-const Login = () => {
+const LoginPage = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -234,4 +234,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default LoginPage;

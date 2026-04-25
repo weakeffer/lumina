@@ -4,8 +4,8 @@ import { ThemeProvider } from '../shared/context/ThemeContext';
 import { SettingsProvider } from '../shared/context/SettingsContext';
 import { ViewModeProvider } from '../shared/context/ViewModeContext';
 
-import Login from '../pages/auth/Login';
-import Register from '../pages/auth/Register';
+import LoginPage from '../pages/auth/LoginPage';
+import RegisterPage from '../pages/auth/RegisterPage';
 import AuthLayout from '../pages/auth/AuthLayout';
 
 import NotesPage from '../pages/notes/NotesPage';
@@ -23,10 +23,8 @@ function App() {
         <ViewModeProvider>
           <BrowserRouter>
             <Routes>
-              <Route element={<AuthLayout />}>
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-              </Route>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
 
               <Route
                 path="/"
