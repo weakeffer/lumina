@@ -462,8 +462,8 @@ const NotesPage = () => {
             />
             <ActionButton
               icon={Brain}
-              onClick={() => updateUI({ isDailySummaryOpen: true })}
-              tooltip="Сводка дня"
+              onClick={() => navigate('/insights')}
+              tooltip="Insights"
             />
             <ActionButton
                 icon={Star}   // import { Star } from 'lucide-react'

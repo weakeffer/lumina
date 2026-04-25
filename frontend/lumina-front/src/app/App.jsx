@@ -10,6 +10,7 @@ import AuthLayout from '../pages/auth/AuthLayout';
 
 import NotesPage from '../pages/notes/NotesPage';
 import ProfilePage from '../features/profile/components/ProfilePage';
+import InsightsPage from '../pages/insights/InsightsPage';
 
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -60,6 +61,15 @@ function App() {
                   </PrivateRoute>
                 }
               />
+              <Route
+                path="/insights"
+                element={
+                  <PrivateRoute>
+                    <InsightsPage />
+                  </PrivateRoute>
+                }
+              />
+
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </BrowserRouter>
