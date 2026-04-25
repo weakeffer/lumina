@@ -134,3 +134,31 @@ class Notes(models.Model):
 
     def delete(self, *args, **kwargs):
         super().delete(*args, **kwargs)
+
+class NoteAnalysis(models.Model):
+    """Результат NLP-анализа заметки"""
+    note = models.OneToOneField(
+        Notes,
+        on_delete=models.CASCADE,
+        related_name='analysis'
+    )
+    # Sentiment
+    sentiment = models.CharField(max_length=20, default='neutral')
+    sentiment_score = models.FloatField(default=0.0)
+    # Доминирующая эмоция
+    dominant_emotion = models.CharField(max_length=50, default='neutral')
+    # Детальные данные (JSON)
+    emotions = models.JSONField(default=dict)
+    keywords = models.JSONField(default=list)
+    entities = models.JSONField(default=dict)
+    topics = models.JSONField(default=list)
+    text_stats = models.JSONField(default=dict)
+    # Мета
+    analyzed_at = models.DateTimeField(auto_now=True)
+    is_analyzed = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = 'Анализ заметки'
+
+    def __str__(self):
+        return f"Analysis for Note #{self.note_id}"

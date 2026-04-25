@@ -28,6 +28,9 @@ import ViewModeToggle from '../../shared/ui/ViewModeToggle';
 import ContextMenu from "../../shared/ui/ContextMenu";
 import { useContextMenu } from "../../shared/lib/hooks/useContextMenu";
 import { getEmptyMenuItems } from "../../features/notes/config/contextMenuConfig.jsx";
+import DailySummary from '../../features/notes/components/DailySummary';
+import { Brain } from 'lucide-react';
+import ActionButton from '../../features/notes/components/ActionButton.jsx';
 
 const NotesPage = () => {
   const { id } = useParams();
@@ -68,6 +71,7 @@ const NotesPage = () => {
     toggleSidebar,
     toggleMobileMenu,
     closeMobileMenu,
+    toogleDailySummary,
     toggleStatistics,
     toggleSettings,
     toggleSearchFilters,
@@ -455,6 +459,11 @@ const NotesPage = () => {
               onChange={changeViewMode}
               className="mr-4" 
             />
+            <ActionButton
+              icon={Brain}
+              onClick={() => updateUI({ isDailySummaryOpen: true })}
+              tooltip="Сводка дня"
+            />
           </Header>
         }
         footer={
@@ -529,6 +538,10 @@ const NotesPage = () => {
             onTagSelect={toggleTag}
             onTagDelete={(tag) => console.log('delete tag', tag)}
           />
+        )}
+
+        {uiState.isDailySummaryOpen && (
+          <DailySummary onClose={() => updateUI({ isDailySummaryOpen: false })} />
         )}
 
         {uiState.isTrashOpen && (

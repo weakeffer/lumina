@@ -915,5 +915,45 @@ export const api = {
             return `${API_URL}${imageUrl}`;
         }
         return `${API_URL}/media/${imageUrl}`;
-    }
+    },
+        // === NLP Analysis ===
+
+    async analyzeNote(noteId) {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/api/notes/${noteId}/analyze/`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Token ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+        return response.json();
+    },
+
+    async getNoteAnalysis(noteId) {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/api/notes/${noteId}/analysis/`, {
+            headers: { 'Authorization': `Token ${token}` },
+        });
+        return response.json();
+    },
+
+    async getDailySummary(date) {
+        const token = localStorage.getItem('token');
+        const dateStr = date || new Date().toISOString().split('T')[0];
+        const response = await fetch(
+            `${API_URL}/api/notes/daily-summary/?date=${dateStr}`,
+            { headers: { 'Authorization': `Token ${token}` } }
+        );
+        return response.json();
+    },
+
+    async analyzeAllNotes() {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/api/notes/analyze-all/`, {
+            method: 'POST',
+            headers: { 'Authorization': `Token ${token}` },
+        });
+        return response.json();
+    },
 };

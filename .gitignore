@@ -98,3 +98,7 @@ postgres_data/
 /static_root/
 /media/uploads/
 /avatars/
+
+nlp_models/
+*.out
+*.bak

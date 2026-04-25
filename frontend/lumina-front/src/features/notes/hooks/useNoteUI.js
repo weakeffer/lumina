@@ -216,6 +216,7 @@ export const useNoteUI = () => {
 
   return {
     uiState,
+    updateUI,
     openNoteModal,
     closeNoteModal,
     toggleSidebar,

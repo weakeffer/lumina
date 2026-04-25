@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.conf import settings
+from ..models import Notes, NoteAnalysis
 import uuid
 import os
 import base64
@@ -12,6 +13,7 @@ from ..domain.dto import (
     CreateNoteDTO, UpdateNoteDTO, CreateGroupDTO, UpdateGroupDTO,
     ImageUploadDTO
 )
+from ..nlp.service import analyze_note_async, get_daily_summary
 
 class NotesViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
@@ -41,7 +43,7 @@ class NotesViewSet(viewsets.ViewSet):
         dto = CreateNoteDTO.from_request(request.data)
         note, message = self.note_service.create_note(request.user.id, dto)
         request.user.profile.update_stats()
-        
+        from ..nlp.service import analyze_note_async
         return Response({
             'message': message,
             'id': note.id,
@@ -52,7 +54,8 @@ class NotesViewSet(viewsets.ViewSet):
             'created_at_iso': note.created_at,
             'updated_at_iso': note.updated_at,
         }, status=status.HTTP_201_CREATED)
-    
+        analyze_note_async(created_note.id)
+
     def update(self, request, pk=None):
         return self._update_note(pk, request)
     
@@ -62,7 +65,8 @@ class NotesViewSet(viewsets.ViewSet):
     def _update_note(self, pk, request):
         dto = UpdateNoteDTO.from_request(request.data)
         note, message = self.note_service.update_note(int(pk), request.user.id, dto)
-
+        analyze_note_async(int(pk))
+        
         if not note:
             return Response(
                 {'error': message},
@@ -284,6 +288,64 @@ class NotesViewSet(viewsets.ViewSet):
     def notes_by_groups(self, request):
         result = self.group_service.get_groups_with_notes(request.user.id)
         return Response(result)
+    
+    @action(detail=True, methods=['post'], url_path='analyze')
+    def analyze(self, request, pk=None):
+        """Запускает NLP-анализ заметки"""
+        note = self.note_service.get_note_detail(int(pk), request.user.id)
+        if not note:
+            return Response({'error': 'Заметка не найдена'}, status=404)
+        analyze_note_async(int(pk))
+        return Response({'message': 'Анализ запущен', 'note_id': pk})
+
+    @action(detail=True, methods=['get'], url_path='analysis')
+    def get_analysis(self, request, pk=None):
+        """Возвращает результат NLP-анализа"""
+        from ..models import NoteAnalysis
+        try:
+            analysis = NoteAnalysis.objects.get(
+                note_id=int(pk),
+                note__user_id=request.user.id
+            )
+            return Response({
+                'note_id': pk,
+                'is_analyzed': analysis.is_analyzed,
+                'sentiment': analysis.sentiment,
+                'sentiment_score': analysis.sentiment_score,
+                'dominant_emotion': analysis.dominant_emotion,
+                'emotions': analysis.emotions,
+                'keywords': analysis.keywords,
+                'entities': analysis.entities,
+                'topics': analysis.topics,
+                'text_stats': analysis.text_stats,
+                'analyzed_at': analysis.analyzed_at.isoformat(),
+            })
+        except NoteAnalysis.DoesNotExist:
+            return Response({'is_analyzed': False, 'note_id': pk})
+
+    @action(detail=False, methods=['get'], url_path='daily-summary')
+    def daily_summary(self, request):
+        """Сводка за день. GET /api/notes/daily-summary/?date=2026-04-24"""
+        date_str = request.query_params.get('date')
+        if not date_str:
+            from datetime import date
+            date_str = date.today().isoformat()
+        summary = get_daily_summary(request.user.id, date_str)
+        return Response(summary)
+
+    @action(detail=False, methods=['post'], url_path='analyze-all')
+    def analyze_all(self, request):
+        """Запускает анализ всех неанализированных заметок пользователя"""
+        from ..models import NoteAnalysis
+        notes = Notes.objects.filter(
+            user_id=request.user.id,
+            is_deleted=False
+        ).exclude(analysis__is_analyzed=True)[:20]  # батч по 20
+
+        for note in notes:
+            analyze_note_async(note.id)
+
+        return Response({'message': f'Запущен анализ {notes.count()} заметок'})
 
 
 class NoteGroupViewSet(viewsets.ViewSet):

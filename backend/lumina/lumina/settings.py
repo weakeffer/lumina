@@ -128,3 +128,6 @@ MAX_UPLOAD_SIZE = 5242880
 
 # Допустимые форматы изображений
 ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif']
+
+NLP_MODELS_DIR = os.path.join(BASE_DIR, 'nlp_models')
+os.makedirs(NLP_MODELS_DIR, exist_ok=True)
