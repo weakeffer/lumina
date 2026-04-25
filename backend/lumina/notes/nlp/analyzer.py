@@ -1,10 +1,12 @@
+# backend/lumina/notes/nlp/analyzer.py
 import os
 import re
+import threading
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 
 import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from sentence_transformers import SentenceTransformer
 from keybert import KeyBERT
 from natasha import (
@@ -18,6 +20,7 @@ from django.conf import settings
 
 MODELS_DIR = os.path.join(settings.BASE_DIR, 'nlp_models')
 
+# Глобальные переменные для моделей
 _emotion_tokenizer = None
 _emotion_model = None
 _kw_model = None
@@ -28,43 +31,10 @@ _names_extractor = None
 _pymorphy = None
 _narrative_pipeline = None
 
+# Защита от гонки потоков
+_models_lock = threading.Lock()
 _models_loaded = False
-
-
-def _load_models():
-    global _emotion_tokenizer, _emotion_model, _kw_model
-    global _segmenter, _morph, _ner_tagger, _names_extractor, _pymorphy
-    global _narrative_pipeline, _models_loaded
-
-    if _models_loaded:
-        return
-
-    rubert_path = os.path.join(MODELS_DIR, 'rubert-tiny2')
-    minilm_path = os.path.join(MODELS_DIR, 'multilingual-minilm')
-
-    # Sentiment модель
-    _emotion_tokenizer = AutoTokenizer.from_pretrained(rubert_path)
-    _emotion_model = AutoModelForSequenceClassification.from_pretrained(rubert_path)
-    _emotion_model.eval()
-
-    # KeyBERT
-    st = SentenceTransformer(minilm_path)
-    _kw_model = KeyBERT(model=st)
-
-    # Natasha NER
-    _segmenter = Segmenter()
-    _morph = MorphVocab()
-    emb = NewsEmbedding()
-    morph_tagger = NewsMorphTagger(emb)
-    _ner_tagger = NewsNERTagger(emb)
-    _names_extractor = NamesExtractor(_morph)
-    _pymorphy = pymorphy3.MorphAnalyzer()
-    _load_models._morph_tagger = morph_tagger
-
-    _models_loaded = True
-
-
-_load_models._morph_tagger = None
+_loading_error = None
 
 SENTIMENT_LABELS = {0: 'negative', 1: 'neutral', 2: 'positive'}
 
@@ -131,15 +101,87 @@ class AnalysisResult:
     entities: Dict[str, List[str]] = field(default_factory=dict)
     topics: List[str] = field(default_factory=list)
     text_stats: Dict = field(default_factory=dict)
-    narrative: str = ''  # Новое поле — текстовый нарратив
+    narrative: str = ''
+
+
+def _load_models():
+    """Потокобезопасная загрузка моделей"""
+    global _emotion_tokenizer, _emotion_model, _kw_model
+    global _segmenter, _morph, _ner_tagger, _names_extractor, _pymorphy
+    global _models_loaded, _loading_error
+
+    # Быстрая проверка без блокировки
+    if _models_loaded:
+        return
+    if _loading_error is not None:
+        raise RuntimeError(f"Модели не загружены: {_loading_error}")
+
+    with _models_lock:
+        # Двойная проверка после захвата блокировки
+        if _models_loaded:
+            return
+        if _loading_error is not None:
+            raise RuntimeError(f"Модели не загружены: {_loading_error}")
+
+        try:
+            rubert_path = os.path.join(MODELS_DIR, 'rubert-tiny2')
+            minilm_path = os.path.join(MODELS_DIR, 'multilingual-minilm')
+
+            # Проверяем наличие моделей
+            if not os.path.exists(rubert_path):
+                raise FileNotFoundError(
+                    f"Модель rubert-tiny2 не найдена в {rubert_path}.\n"
+                    f"Запустите: python manage.py download_models"
+                )
+            if not os.path.exists(minilm_path):
+                raise FileNotFoundError(
+                    f"Модель multilingual-minilm не найдена в {minilm_path}.\n"
+                    f"Запустите: python manage.py download_models"
+                )
+
+            # Sentiment модель
+            _emotion_tokenizer = AutoTokenizer.from_pretrained(rubert_path)
+            _emotion_model = AutoModelForSequenceClassification.from_pretrained(rubert_path)
+            _emotion_model.eval()
+
+            # KeyBERT
+            st = SentenceTransformer(minilm_path)
+            _kw_model = KeyBERT(model=st)
+
+            # Natasha NER
+            _segmenter = Segmenter()
+            _morph = MorphVocab()
+            emb = NewsEmbedding()
+            morph_tagger = NewsMorphTagger(emb)
+            _ner_tagger = NewsNERTagger(emb)
+            _names_extractor = NamesExtractor(_morph)
+            _pymorphy = pymorphy3.MorphAnalyzer()
+            _load_models._morph_tagger = morph_tagger
+
+            _models_loaded = True
+
+        except Exception as e:
+            _loading_error = str(e)
+            raise RuntimeError(f"Ошибка загрузки NLP-моделей: {e}")
+
+
+_load_models._morph_tagger = None
 
 
 def analyze_text(text: str) -> AnalysisResult:
-    """Основная функция анализа текста"""
+    """Основная функция анализа текста с graceful fallback"""
     if not text or len(text.strip()) < 3:
         return AnalysisResult()
 
-    _load_models()
+    try:
+        _load_models()
+    except RuntimeError as e:
+        # Fallback — возвращаем базовый результат без анализа
+        print(f"[NLP] Предупреждение: {e}")
+        result = AnalysisResult()
+        result.narrative = "NLP-модели не загружены. Запустите: python manage.py download_models"
+        return result
+
     result = AnalysisResult()
 
     clean = _clean_text(text)
@@ -161,7 +203,6 @@ def analyze_text(text: str) -> AnalysisResult:
         'avg_sentence_length': len(words) / max(len(sentences), 1),
     }
 
-    # Генерируем нарратив на русском
     result.narrative = _generate_narrative(
         text=clean,
         sentiment=result.sentiment,
@@ -231,30 +272,24 @@ def generate_day_narrative(
     # Строим нарратив по шаблонам
     parts = []
 
-    # 1. Вступление — общий тон
     opening = _day_opening(day_tone, note_count, total_words)
     parts.append(opening)
 
-    # 2. Эмоциональная часть
     if top_emotions:
         emotion_text = _emotion_narrative(top_emotions, day_tone)
         if emotion_text:
             parts.append(emotion_text)
 
-    # 3. Тематическая часть
     if unique_topics:
         topic_text = _topic_narrative(unique_topics, day_tone)
         if topic_text:
             parts.append(topic_text)
 
-    # 4. Заключение — рекомендация или наблюдение
     closing = _day_closing(day_tone, top_emotions, unique_topics)
     parts.append(closing)
 
     return ' '.join(parts)
 
-
-# ── Вспомогательные для нарратива ────────────────────────────────────────
 
 EMOTION_NAMES_RU = {
     'joy': 'радость', 'sadness': 'грусть', 'anger': 'раздражение',
@@ -293,7 +328,7 @@ def _day_opening(tone: str, note_count: int, total_words: int) -> str:
         ]
 
     import random
-    random.seed(note_count + total_words)  # детерминированный выбор
+    random.seed(note_count + total_words)
     return random.choice(openings)
 
 
@@ -364,7 +399,6 @@ def _day_closing(
         ],
     }
 
-    # Специфичные закрытия по доминирующей эмоции
     emotion_closings = {
         'fatigue': "Усталость — сигнал: стоит позаботиться о восстановлении.",
         'pride': "Гордость за результат — заслуженное чувство. Зафиксируй достижение.",
@@ -437,8 +471,6 @@ def _pluralize(n: int, form1: str, form2: str, form5: str) -> str:
     return form5
 
 
-# ── Внутренние функции анализа ────────────────────────────────────────────
-
 def _clean_text(text: str) -> str:
     text = re.sub(r'!\[.*?\]\(.*?\)', '', text)
     text = re.sub(r'\*+|_+|`+|#{1,6}\s', '', text)
@@ -462,27 +494,54 @@ def _get_sentiment(text: str) -> Tuple[str, float]:
 
 
 def _detect_emotions(text: str, sentiment: str, sentiment_score: float) -> Dict[str, float]:
+    """
+    Детектирует эмоции с проверкой границ слов и учётом лемматизации.
+    Исправлена проблема с поиском подстрок ("незлой" не поймает "злой").
+    """
     text_lower = text.lower()
+    
+    # Разбиваем на слова для проверки границ
     words = text_lower.split()
     scores = {}
 
     for emotion, keywords in EMOTION_LEXICON.items():
         hits = 0
         for kw in keywords:
-            if kw in text_lower:
-                # Проверяем наличие негатора рядом
-                idx = text_lower.find(kw)
-                context = text_lower[max(0, idx - 20):idx]
+            kw_lower = kw.lower()
+            
+            # Проверяем как целое слово с границами
+            # Ищем отдельное слово, а не подстроку
+            found = False
+            for word in words:
+                # Точное совпадение или вхождение с учётом пунктуации
+                if word == kw_lower or word.startswith(kw_lower + '?') or word.startswith(kw_lower + '!'):
+                    found = True
+                    break
+                # Проверяем, не является ли kw частью другого слова с приставкой
+                # Например "незлой" — не должно считаться как "злой"
+                if kw_lower in word and len(word) > len(kw_lower):
+                    # Если слово длиннее ключевого слова, проверяем, что это не приставка
+                    # Ищем "злой" но не "незлой"
+                    prefix = word[:word.find(kw_lower)]
+                    if prefix and any(neg in prefix for neg in NEGATORS):
+                        continue  # Есть негация — пропускаем
+                    found = True
+                    break
+            
+            if found:
+                # Находим контекст для проверки негаторов/интенсификаторов
+                idx = text_lower.find(kw_lower)
+                start_context = max(0, idx - 30)
+                context = text_lower[start_context:idx]
+                
                 negated = any(neg in context for neg in NEGATORS)
-
-                # Проверяем интенсификатор
                 intensified = any(intens in context for intens in INTENSIFIERS)
-
+                
                 if not negated:
                     hits += 1.5 if intensified else 1.0
 
         if hits > 0:
-            scores[emotion] = min(1.0, hits * 0.35 + 0.15)
+            scores[emotion] = min(1.0, hits * 0.3 + 0.15)
 
     # Усиливаем через sentiment
     if sentiment == 'positive' and sentiment_score > 0.6:
