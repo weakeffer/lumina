@@ -44,6 +44,7 @@ class NotesViewSet(viewsets.ViewSet):
         note, message = self.note_service.create_note(request.user.id, dto)
         request.user.profile.update_stats()
         from ..nlp.service import analyze_note_async
+        analyze_note_async(note.id)
         return Response({
             'message': message,
             'id': note.id,
@@ -54,7 +55,6 @@ class NotesViewSet(viewsets.ViewSet):
             'created_at_iso': note.created_at,
             'updated_at_iso': note.updated_at,
         }, status=status.HTTP_201_CREATED)
-        analyze_note_async(created_note.id)
 
     def update(self, request, pk=None):
         return self._update_note(pk, request)
@@ -291,21 +291,20 @@ class NotesViewSet(viewsets.ViewSet):
     
     @action(detail=True, methods=['post'], url_path='analyze')
     def analyze(self, request, pk=None):
-        """Запускает NLP-анализ заметки"""
+        """Запускает NLP-анализ заметки вручную"""
         note = self.note_service.get_note_detail(int(pk), request.user.id)
         if not note:
             return Response({'error': 'Заметка не найдена'}, status=404)
         analyze_note_async(int(pk))
         return Response({'message': 'Анализ запущен', 'note_id': pk})
-
+ 
     @action(detail=True, methods=['get'], url_path='analysis')
     def get_analysis(self, request, pk=None):
         """Возвращает результат NLP-анализа"""
-        from ..models import NoteAnalysis
         try:
             analysis = NoteAnalysis.objects.get(
                 note_id=int(pk),
-                note__user_id=request.user.id
+                note__user_id=request.user.id,
             )
             return Response({
                 'note_id': pk,
@@ -318,35 +317,38 @@ class NotesViewSet(viewsets.ViewSet):
                 'entities': analysis.entities,
                 'topics': analysis.topics,
                 'text_stats': analysis.text_stats,
+                'narrative': analysis.narrative,
                 'analyzed_at': analysis.analyzed_at.isoformat(),
             })
         except NoteAnalysis.DoesNotExist:
             return Response({'is_analyzed': False, 'note_id': pk})
-
+ 
     @action(detail=False, methods=['get'], url_path='daily-summary')
     def daily_summary(self, request):
-        """Сводка за день. GET /api/notes/daily-summary/?date=2026-04-24"""
+        """
+        Сводка за день с локально сгенерированным нарративом.
+        GET /api/notes/daily-summary/?date=2026-04-24
+        """
         date_str = request.query_params.get('date')
         if not date_str:
             from datetime import date
             date_str = date.today().isoformat()
         summary = get_daily_summary(request.user.id, date_str)
         return Response(summary)
-
+ 
     @action(detail=False, methods=['post'], url_path='analyze-all')
     def analyze_all(self, request):
-        """Запускает анализ всех неанализированных заметок пользователя"""
-        from ..models import NoteAnalysis
+        """Запускает анализ всех неанализированных заметок"""
         notes = Notes.objects.filter(
             user_id=request.user.id,
-            is_deleted=False
-        ).exclude(analysis__is_analyzed=True)[:20]  # батч по 20
-
+            is_deleted=False,
+        ).exclude(analysis__is_analyzed=True)[:20]
+ 
         for note in notes:
             analyze_note_async(note.id)
-
+ 
         return Response({'message': f'Запущен анализ {notes.count()} заметок'})
-    
+ 
     @action(detail=False, methods=['get'], url_path='personality-profile')
     def personality_profile(self, request):
         """Полный психологический профиль пользователя"""

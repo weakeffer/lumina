@@ -149,6 +149,12 @@ class NoteAnalysis(models.Model):
     dominant_emotion = models.CharField(max_length=50, default='neutral')
     # Детальные данные (JSON)
     emotions = models.JSONField(default=dict)
+    narrative = models.TextField(
+                default='',
+                blank=True,
+                verbose_name='Нарратив',
+                help_text='Текстовое описание заметки, сгенерированное локально',
+            )
     keywords = models.JSONField(default=list)
     entities = models.JSONField(default=dict)
     topics = models.JSONField(default=list)
