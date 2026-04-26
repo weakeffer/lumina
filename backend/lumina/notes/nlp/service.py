@@ -93,6 +93,13 @@ def get_daily_summary(user_id: int, date_str: str) -> dict:
     target_date = parse_date(date_str)
     if not target_date:
         return {}
+    
+    # Кэш на 10 минут — сводка дня меняется редко
+    from django.core.cache import cache
+    cache_key = f'daily_summary_{user_id}_{date_str}'
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
 
     start = timezone.make_aware(
         timezone.datetime.combine(target_date, timezone.datetime.min.time())
@@ -114,7 +121,6 @@ def get_daily_summary(user_id: int, date_str: str) -> dict:
             'narrative': 'За этот день записей нет.',
         }
 
-    # Собираем ID заметок, которые нужно проанализировать
     notes_to_analyze = []
     for note in notes:
         try:
@@ -123,30 +129,28 @@ def get_daily_summary(user_id: int, date_str: str) -> dict:
         except NoteAnalysis.DoesNotExist:
             notes_to_analyze.append(note.id)
 
-    # Асинхронно анализируем все необработанные заметки и ждём результата
     if notes_to_analyze:
-        futures = []
-        for note_id in notes_to_analyze:
-            future = _executor.submit(_run_analysis_sync, note_id)
-            futures.append(future)
-        
-        # Ждём завершения всех анализов с таймаутом
-        for future in as_completed(futures):
+        # Запускаем все анализы параллельно и ждём с общим таймаутом 120с
+        futures = {
+            _executor.submit(_run_analysis_sync, note_id): note_id
+            for note_id in notes_to_analyze
+        }
+        for future in as_completed(futures, timeout=120):
+            note_id = futures[future]
             try:
-                future.result(timeout=60)  # максимум 60 секунд на заметку
-            except TimeoutError:
-                print(f"[NLP] Таймаут анализа заметки")
+                result_note_id, success, error = future.result()
+                if not success:
+                    print(f"[NLP] Анализ заметки {note_id} не удался: {error}")
             except Exception as e:
-                print(f"[NLP] Ошибка при ожидании анализа: {e}")
-    
-    # Обновляем все объекты после завершения анализов
-    # Важно: создаём новый QuerySet, чтобы получить свежие данные
-    notes = Notes.objects.filter(
-        user_id=user_id,
-        is_deleted=False,
-        created_at__gte=start,
-        created_at__lt=end,
-    ).prefetch_related('analysis').order_by('created_at')
+                print(f"[NLP] Исключение при анализе заметки {note_id}: {e}")
+
+        # Важно: пересоздаём queryset чтобы получить свежие данные из БД
+        notes = Notes.objects.filter(
+            user_id=user_id,
+            is_deleted=False,
+            created_at__gte=start,
+            created_at__lt=end,
+        ).select_related('analysis').order_by('created_at')
 
     # Агрегируем данные
     all_emotions: dict = {}
@@ -223,7 +227,6 @@ def get_daily_summary(user_id: int, date_str: str) -> dict:
 
     # Топ тем
     sorted_topics = dict(sorted(all_topics.items(), key=lambda x: -x[1])[:10])
-
     return {
         'date': date_str,
         'notes_count': notes.count(),

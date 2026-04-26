@@ -426,7 +426,10 @@ def _generate_narrative(
     entities: Dict[str, List[str]],
     text_stats: Dict,
 ) -> str:
-    """Генерирует короткий нарратив для одной заметки"""
+    """
+    Генерирует связный нарратив для одной заметки.
+    Использует шаблонный подход с вариативностью — без внешних LLM.
+    """
     word_count = text_stats.get('word_count', 0)
 
     if word_count < 5:
@@ -435,25 +438,75 @@ def _generate_narrative(
     emotion_name = EMOTION_NAMES_RU.get(dominant_emotion, 'нейтральное')
     emoji = EMOTION_EMOJI_MAP.get(dominant_emotion, '')
 
+    # Формируем описание тональности
     sentiment_phrases = {
-        'positive': 'позитивный',
-        'negative': 'напряжённый',
-        'neutral': 'нейтральный',
+        'positive': [
+            'записана в позитивном ключе',
+            'пронизана положительным настроем',
+            'отражает хорошее расположение духа',
+        ],
+        'negative': [
+            'несёт напряжённый эмоциональный фон',
+            'отражает непростой момент',
+            'написана в трудный период',
+        ],
+        'neutral': [
+            'написана спокойно и взвешенно',
+            'отличается нейтральным тоном',
+            'носит фактический, рассудительный характер',
+        ],
     }
-    tone_word = sentiment_phrases.get(sentiment, 'нейтральный')
 
-    parts = [f"Тон записи — {tone_word}, доминирует {emotion_name} {emoji}."]
+    import random
+    random.seed(word_count + len(text))
+    tone_phrase = random.choice(sentiment_phrases.get(sentiment, sentiment_phrases['neutral']))
 
+    parts = [f"Заметка {tone_phrase}."]
+
+    # Добавляем про доминирующую эмоцию
+    if dominant_emotion != 'neutral' and emotions:
+        top_score = emotions.get(dominant_emotion, 0)
+        intensity_word = 'явно ощущается' if top_score > 0.6 else 'прослеживается' if top_score > 0.3 else 'слегка заметна'
+        parts.append(f"В тексте {intensity_word} {emotion_name} {emoji}.")
+
+    # Несколько эмоций
+    secondary = [(e, s) for e, s in emotions.items() if e != dominant_emotion and s > 0.2]
+    if secondary:
+        names = [EMOTION_NAMES_RU.get(e, e) for e, _ in secondary[:2]]
+        parts.append(f"Дополнительно присутствуют: {', '.join(names)}.")
+
+    # Ключевые темы
     if keywords:
         kw_str = ', '.join(f'«{k}»' for k in keywords[:3])
-        parts.append(f"Ключевые темы: {kw_str}.")
+        topic_phrases = [
+            f"Центральные темы: {kw_str}.",
+            f"Запись касается: {kw_str}.",
+            f"Ключевые сюжеты — {kw_str}.",
+        ]
+        parts.append(random.choice(topic_phrases))
 
+    # Упомянутые люди/организации
     persons = entities.get('PER', [])
     orgs = entities.get('ORG', [])
     if persons:
-        parts.append(f"Упомянуты люди: {', '.join(persons[:2])}.")
+        parts.append(f"Упомянуты: {', '.join(persons[:2])}.")
     if orgs:
-        parts.append(f"Организации: {', '.join(orgs[:2])}.")
+        parts.append(f"Фигурируют организации: {', '.join(orgs[:2])}.")
+
+    # Финальный инсайт
+    insights = {
+        'fatigue': "Возможно, стоит замедлиться и дать себе отдых.",
+        'joy': "Это состояние стоит запомнить — что именно его вызвало?",
+        'anger': "Что стоит за этим раздражением — неоправданные ожидания или нарушенные границы?",
+        'fear': "Страх часто указывает на то, что важно. О чём именно беспокоит эта ситуация?",
+        'interest': "Любопытство — хороший сигнал. Куда ведёт этот интерес?",
+        'sadness': "Грусть — тоже часть опыта. Что эта запись говорит о твоих потребностях?",
+        'pride': "Достижение зафиксировано. Это важно — признавать собственные успехи.",
+        'gratitude': "Благодарность в тексте — редкое и ценное качество.",
+    }
+
+    if dominant_emotion in insights and word_count > 20:
+        parts.append(insights[dominant_emotion])
 
     return ' '.join(parts)
 
@@ -493,56 +546,40 @@ def _get_sentiment(text: str) -> Tuple[str, float]:
     return label, score
 
 
-def _detect_emotions(text: str, sentiment: str, sentiment_score: float) -> Dict[str, float]:
-    """
-    Детектирует эмоции с проверкой границ слов и учётом лемматизации.
-    Исправлена проблема с поиском подстрок ("незлой" не поймает "злой").
-    """
+def _detect_emotions(text: str, sentiment: str, sentiment_score: float) -> dict:
     text_lower = text.lower()
-    
-    # Разбиваем на слова для проверки границ
-    words = text_lower.split()
     scores = {}
-
+ 
     for emotion, keywords in EMOTION_LEXICON.items():
-        hits = 0
+        hits = 0.0
         for kw in keywords:
-            kw_lower = kw.lower()
-            
-            # Проверяем как целое слово с границами
-            # Ищем отдельное слово, а не подстроку
-            found = False
-            for word in words:
-                # Точное совпадение или вхождение с учётом пунктуации
-                if word == kw_lower or word.startswith(kw_lower + '?') or word.startswith(kw_lower + '!'):
-                    found = True
-                    break
-                # Проверяем, не является ли kw частью другого слова с приставкой
-                # Например "незлой" — не должно считаться как "злой"
-                if kw_lower in word and len(word) > len(kw_lower):
-                    # Если слово длиннее ключевого слова, проверяем, что это не приставка
-                    # Ищем "злой" но не "незлой"
-                    prefix = word[:word.find(kw_lower)]
-                    if prefix and any(neg in prefix for neg in NEGATORS):
-                        continue  # Есть негация — пропускаем
-                    found = True
-                    break
-            
-            if found:
-                # Находим контекст для проверки негаторов/интенсификаторов
-                idx = text_lower.find(kw_lower)
-                start_context = max(0, idx - 30)
-                context = text_lower[start_context:idx]
-                
-                negated = any(neg in context for neg in NEGATORS)
-                intensified = any(intens in context for intens in INTENSIFIERS)
-                
-                if not negated:
-                    hits += 1.5 if intensified else 1.0
-
+            kw_escaped = re.escape(kw.lower())
+            # Ищем целое слово/фразу с границами
+            pattern = r'(?<!\w)' + kw_escaped + r'(?!\w)'
+            for match in re.finditer(pattern, text_lower):
+                start = match.start()
+                # Контекст 40 символов слева
+                ctx_start = max(0, start - 40)
+                context = text_lower[ctx_start:start]
+ 
+                # Проверяем негаторы в контексте
+                negated = any(
+                    re.search(r'(?<!\w)' + re.escape(neg) + r'(?!\w)', context)
+                    for neg in NEGATORS
+                )
+                if negated:
+                    continue
+ 
+                # Проверяем интенсификаторы в контексте
+                intensified = any(
+                    re.search(r'(?<!\w)' + re.escape(inten) + r'(?!\w)', context)
+                    for inten in INTENSIFIERS
+                )
+                hits += 1.5 if intensified else 1.0
+ 
         if hits > 0:
             scores[emotion] = min(1.0, hits * 0.3 + 0.15)
-
+ 
     # Усиливаем через sentiment
     if sentiment == 'positive' and sentiment_score > 0.6:
         for e in ('joy', 'interest', 'pride', 'gratitude', 'surprise'):
@@ -552,13 +589,12 @@ def _detect_emotions(text: str, sentiment: str, sentiment_score: float) -> Dict[
         for e in ('sadness', 'anger', 'fear', 'fatigue'):
             if e in scores:
                 scores[e] = min(1.0, scores[e] + 0.2)
-
+ 
     if not scores:
         base = {'positive': 'joy', 'negative': 'sadness', 'neutral': 'neutral'}
-        scores[base[sentiment]] = sentiment_score
-
+        scores[base.get(sentiment, 'neutral')] = sentiment_score
+ 
     return dict(sorted(scores.items(), key=lambda x: -x[1])[:6])
-
 
 def _extract_keywords(text: str) -> List[str]:
     if len(text.split()) < 3:

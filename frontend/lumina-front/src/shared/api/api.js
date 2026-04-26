@@ -135,6 +135,7 @@ export const api = {
                     updated_at: note.updated_at_formatted || note.created_at_formatted || note.created_at,
                     user: note.user,
                     isFavorite: note.is_favorite || false,
+                    dominant_emotion: note.dominant_emotion || null,
                     tags: note.tags || [],
                     images_count: note.images_count || 0,
                     first_image: note.first_image || null,

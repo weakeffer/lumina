@@ -78,6 +78,7 @@ class NoteListDTO:
     group_id: Optional[int]
     group_name: Optional[str]
     group_color: Optional[str]
+    dominant_emotion: Optional[str] = None
     
     @classmethod
     def from_entity(cls, note: NoteEntity, group_name: Optional[str] = None,
@@ -103,7 +104,12 @@ class NoteListDTO:
         
         images_count = len(note.images)
         first_image = note.images[0].get('url') if note.images else None
-        
+        dominant_emotion = None
+        try:
+            if hasattr(note, '_analysis_emotion'):
+                dominant_emotion = note._analysis_emotion
+        except Exception:
+            pass
         return cls(
             id=note.id,
             title=note.title,

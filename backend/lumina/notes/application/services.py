@@ -30,6 +30,14 @@ class NoteService:
                 filters['group_id'] = int(group_id)
         
         notes = self.note_repository.get_all(user_id, **filters)
+        from ..models import NoteAnalysis
+        note_ids = [n.id for n in notes if n.id]
+        emotion_map = {}
+        if note_ids:
+            for analysis in NoteAnalysis.objects.filter(
+                note_id__in=note_ids, is_analyzed=True
+            ).values('note_id', 'dominant_emotion'):
+                emotion_map[analysis['note_id']] = analysis['dominant_emotion']
 
         result = []
         for note in notes:
@@ -41,7 +49,9 @@ class NoteService:
                     group_name = group.name
                     group_color = group.color
             
-            result.append(NoteListDTO.from_entity(note, group_name, group_color))
+            dto = NoteListDTO.from_entity(note, group_name, group_color)
+            dto.dominant_emotion = emotion_map.get(note.id)
+            result.append(dto)
         
         return result
     

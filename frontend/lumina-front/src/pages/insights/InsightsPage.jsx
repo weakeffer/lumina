@@ -861,175 +861,120 @@ function MoodCalendar({ moodHistory, profile, themeClasses, isDark }) {
 // ─────────────────────────────────────────────────────────────────────────
 
 function TopicsSection({ profile, themeClasses, isDark }) {
-  const cloudContainerRef = useRef(null);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const cloudRef = useRef(null);
+  const svgRef = useRef(null);
 
   useEffect(() => {
-    if (!cloudContainerRef.current || !profile.tag_cloud?.length || isDrawing) return;
-    
-    const container = cloudContainerRef.current;
-    const width = container.clientWidth || 800;
-    const height = 500;
-    
-    // Очищаем контейнер
-    container.innerHTML = '';
-    
-    // Подготавливаем данные для облака
-    const words = profile.tag_cloud.slice(0, 60).map(item => ({
+    const container = cloudRef.current;
+    if (!container || !profile.tag_cloud?.length) return;
+
+    // Удаляем предыдущий SVG
+    if (svgRef.current) {
+      svgRef.current.remove();
+      svgRef.current = null;
+    }
+
+    const W = container.clientWidth || 800;
+    const H = 440;
+
+    // Цвет по тональности темы
+    const getColor = (sentiment) => {
+      if (sentiment === 'positive') return isDark ? '#4ade80' : '#16a34a';
+      if (sentiment === 'negative') return isDark ? '#f87171' : '#dc2626';
+      return isDark ? '#818cf8' : '#4338ca';
+    };
+
+    const words = profile.tag_cloud.slice(0, 60).map((item) => ({
       text: item.topic,
-      size: 12 + Math.pow(item.weight, 0.7) * 48, // Нелинейное масштабирование
-      weight: item.weight,
+      size: Math.round(13 + Math.pow(item.weight, 0.6) * 44),
       sentiment: item.dominant_sentiment,
       count: item.count,
+      weight: item.weight,
     }));
-    
-    if (words.length === 0) return;
-    
-    setIsDrawing(true);
-    
-    // Определяем цвета в зависимости от сентимента
-    const getColor = (sentiment) => {
-      if (sentiment === 'positive') return '#22c55e';
-      if (sentiment === 'negative') return '#ef4444';
-      return '#6366f1';
-    };
-    
-    // Настраиваем d3-cloud
-    const layout = cloud()
-      .size([width, height])
+
+    cloud()
+      .size([W, H])
       .words(words)
-      .padding(5)
-      .rotate(() => {
-        // Случайный поворот: 0 или 90 градусов с вероятностью 30%
-        return Math.random() > 0.7 ? 90 : 0;
-      })
+      .padding(6)
+      .rotate(() => (Math.random() > 0.75 ? 90 : 0))
       .font('system-ui, -apple-system, sans-serif')
-      .fontSize(d => d.size)
-      .on('end', (renderedWords) => {
-        // Создаём SVG после завершения layout
-        const svg = d3.select(container)
+      .fontSize((d) => d.size)
+      .on('end', (placed) => {
+        const svg = d3
+          .select(container)
           .append('svg')
-          .attr('width', width)
-          .attr('height', height)
-          .attr('viewBox', `0 0 ${width} ${height}`)
-          .attr('style', 'background: transparent')
+          .attr('width', W)
+          .attr('height', H)
+          .attr('viewBox', `0 0 ${W} ${H}`)
+          .style('overflow', 'visible');
+
+        svgRef.current = svg.node();
+
+        const g = svg
           .append('g')
-          .attr('transform', `translate(${width / 2}, ${height / 2})`);
-        
-        // Добавляем слова
-        const wordsGroup = svg.selectAll('g')
-          .data(renderedWords)
+          .attr('transform', `translate(${W / 2},${H / 2})`);
+
+        g.selectAll('text')
+          .data(placed)
           .enter()
-          .append('g')
-          .attr('transform', d => `translate(${d.x}, ${d.y}) rotate(${d.rotate})`)
-          .attr('class', 'word-tag')
-          .style('cursor', 'pointer')
-          .style('transition', 'all 0.2s ease');
-        
-        // Добавляем фоновый прямоугольник для лучшей читаемости
-        wordsGroup.append('rect')
-          .attr('rx', 8)
-          .attr('ry', 8)
-          .attr('fill', d => {
-            const color = getColor(d.sentiment);
-            return isDark ? `${color}22` : `${color}14`;
-          })
-          .attr('stroke', d => {
-            const color = getColor(d.sentiment);
-            return `${color}60`;
-          })
-          .attr('stroke-width', 1)
-          .attr('x', d => {
-            // Временная мера — будет обновлено после рендера текста
-            return -d.size * d.text.length * 0.25;
-          })
-          .attr('y', d => -d.size * 0.5)
-          .attr('width', d => d.size * d.text.length * 0.55)
-          .attr('height', d => d.size * 1.2);
-        
-        // Добавляем текст
-        wordsGroup.append('text')
-          .text(d => d.text)
+          .append('text')
+          .style('font-size', (d) => `${d.size}px`)
+          .style('font-family', 'system-ui, -apple-system, sans-serif')
+          .style('font-weight', (d) => (d.weight > 0.6 ? '600' : '400'))
+          .style('fill', (d) => getColor(d.sentiment))
+          .style('opacity', (d) => 0.55 + d.weight * 0.45)
+          .style('cursor', 'default')
+          .style('transition', 'opacity 0.2s, font-size 0.2s')
           .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
-          .attr('fill', d => getColor(d.sentiment))
-          .attr('font-size', d => d.size)
-          .attr('font-weight', d => d.weight > 0.7 ? '600' : '400')
-          .attr('font-family', 'system-ui, -apple-system, sans-serif')
-          .style('pointer-events', 'none');
-        
-        // Добавляем интерактив
-        wordsGroup
-          .on('mouseenter', function() {
+          .attr('transform', (d) => `translate(${d.x},${d.y}) rotate(${d.rotate})`)
+          .text((d) => d.text)
+          .append('title')  // Tooltip
+          .text((d) => `${d.text} · ${d.count} упоминаний`);
+
+        // Hover-эффект
+        g.selectAll('text')
+          .on('mouseenter', function (event, d) {
             d3.select(this)
-              .transition()
-              .duration(200)
-              .attr('transform', function(d) {
-                const current = d3.select(this).attr('transform');
-                // Увеличиваем масштаб при наведении
-                return current + ' scale(1.05)';
-              });
-            d3.select(this).select('rect')
-              .transition()
-              .duration(200)
-              .attr('fill', d => {
-                const color = getColor(d.sentiment);
-                return isDark ? `${color}44` : `${color}28`;
-              });
+              .style('opacity', 1)
+              .style('font-size', `${d.size * 1.1}px`);
           })
-          .on('mouseleave', function() {
+          .on('mouseleave', function (event, d) {
             d3.select(this)
-              .transition()
-              .duration(200)
-              .attr('transform', function(d) {
-                const current = d3.select(this).attr('transform');
-                return current.replace(' scale(1.05)', '');
-              });
-            d3.select(this).select('rect')
-              .transition()
-              .duration(200)
-              .attr('fill', d => {
-                const color = getColor(d.sentiment);
-                return isDark ? `${color}22` : `${color}14`;
-              });
+              .style('opacity', 0.55 + d.weight * 0.45)
+              .style('font-size', `${d.size}px`);
           });
-        
-        setIsDrawing(false);
-      });
-    
-    // Запускаем layout
-    layout.start();
-    
-    // Обработка resize
-    const handleResize = () => {
-      if (container.clientWidth !== width) {
-        container.innerHTML = '';
-        setIsDrawing(false);
+      })
+      .start();
+
+    // Cleanup при unmount
+    return () => {
+      if (svgRef.current) {
+        svgRef.current.remove();
+        svgRef.current = null;
       }
     };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [profile, isDark, isDrawing]);
+  }, [profile.tag_cloud, isDark]);
 
   return (
     <div className="space-y-6">
-      {/* Cloud - исправленное */}
-      <div className={`rounded-2xl border ${themeClasses.colors.border.primary} ${themeClasses.colors.bg.secondary} p-6`}>
+      {/* Word cloud */}
+      <div
+        className={`rounded-2xl border ${themeClasses.colors.border.primary} ${themeClasses.colors.bg.secondary} p-6`}
+      >
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className={`text-sm font-semibold ${themeClasses.colors.text.primary}`}>
               Облако тем
             </h3>
             <p className={`text-xs ${themeClasses.colors.text.tertiary} mt-0.5`}>
-              Размер слова = частота упоминания
+              Размер = частота · Цвет = тональность
             </p>
           </div>
           <div className="flex items-center gap-3 text-xs">
             {[
-              { color: '#22c55e', label: 'Позитивные' },
-              { color: '#6366f1', label: 'Нейтральные' },
-              { color: '#ef4444', label: 'Сложные' },
+              { color: isDark ? '#4ade80' : '#16a34a', label: 'Позитивные' },
+              { color: isDark ? '#818cf8' : '#4338ca', label: 'Нейтральные' },
+              { color: isDark ? '#f87171' : '#dc2626', label: 'Сложные' },
             ].map(({ color, label }) => (
               <div key={label} className="flex items-center gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
@@ -1038,73 +983,55 @@ function TopicsSection({ profile, themeClasses, isDark }) {
             ))}
           </div>
         </div>
-        
-        {/* Контейнер для облака */}
-        <div 
-          ref={cloudContainerRef} 
-          style={{ 
-            minHeight: 500, 
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
+
+        {/* Контейнер для d3-cloud */}
+        <div
+          ref={cloudRef}
+          style={{ minHeight: 440, width: '100%' }}
           className="overflow-hidden"
-        >
-          {isDrawing && (
-            <div className="flex items-center gap-2 text-sm text-gray-400">
-              <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-              Построение облака...
-            </div>
-          )}
-        </div>
-        
-        {/* Легенда размера */}
-        <div className="flex items-center justify-center gap-6 mt-4 pt-3 border-t border-gray-200 dark:border-gray-800">
-          {[
-            { size: '12px', label: 'Редко', opacity: 0.5 },
-            { size: '20px', label: 'Часто', opacity: 0.7 },
-            { size: '36px', label: 'Очень часто', opacity: 1 },
-          ].map(({ size, label, opacity }) => (
-            <div key={label} className="flex items-center gap-2">
-              <span 
-                className="font-medium text-indigo-500 dark:text-indigo-400"
-                style={{ fontSize: size, opacity }}
-              >
-                Тема
-              </span>
-              <span className={`text-xs ${themeClasses.colors.text.tertiary}`}>{label}</span>
-            </div>
-          ))}
-        </div>
+        />
+
+        {profile.tag_cloud?.length === 0 && (
+          <p className={`text-center py-16 text-sm ${themeClasses.colors.text.tertiary}`}>
+            Напишите несколько заметок — темы появятся здесь
+          </p>
+        )}
       </div>
 
-      {/* Weekly dynamics */}
+      {/* Weekly dynamics — без изменений */}
       {profile.topics_dynamics?.length > 0 && (
-        <div className={`rounded-2xl border ${themeClasses.colors.border.primary} ${themeClasses.colors.bg.secondary} p-5`}>
+        <div
+          className={`rounded-2xl border ${themeClasses.colors.border.primary} ${themeClasses.colors.bg.secondary} p-5`}
+        >
           <h3 className={`text-sm font-semibold ${themeClasses.colors.text.primary} mb-5`}>
             Динамика тем по неделям
           </h3>
           <div className="space-y-4">
             {profile.topics_dynamics.slice(-8).reverse().map(({ week, topics }) => (
               <div key={week} className="flex items-start gap-4">
-                <span className={`text-xs ${themeClasses.colors.text.tertiary} w-16 shrink-0 pt-1.5 font-mono`}>
+                <span
+                  className={`text-xs ${themeClasses.colors.text.tertiary} w-16 shrink-0 pt-1.5 font-mono`}
+                >
                   {week.slice(5)}
                 </span>
                 <div className="flex flex-wrap gap-1.5 flex-1">
                   {topics.map(({ topic, count }) => (
                     <span
                       key={topic}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium`}
+                      className="px-2.5 py-1 rounded-full text-xs font-medium"
                       style={{
-                        background: isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.08)',
+                        background: isDark
+                          ? 'rgba(99,102,241,0.15)'
+                          : 'rgba(99,102,241,0.08)',
                         color: isDark ? '#a5b4fc' : '#4338ca',
                         border: '1px solid rgba(99,102,241,0.2)',
                       }}
                     >
                       {topic}
                       {count > 1 && (
-                        <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.55 }}>×{count}</span>
+                        <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.55 }}>
+                          ×{count}
+                        </span>
                       )}
                     </span>
                   ))}
@@ -1117,7 +1044,6 @@ function TopicsSection({ profile, themeClasses, isDark }) {
     </div>
   );
 }
-
 // ─────────────────────────────────────────────────────────────────────────
 // Секция: Черты личности (без изменений)
 // ─────────────────────────────────────────────────────────────────────────

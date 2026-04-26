@@ -43,6 +43,11 @@ class NotesViewSet(viewsets.ViewSet):
         dto = CreateNoteDTO.from_request(request.data)
         note, message = self.note_service.create_note(request.user.id, dto)
         request.user.profile.update_stats()
+        try:
+            from ..nlp.profile_service import invalidate_profile_cache
+            invalidate_profile_cache(request.user.id)
+        except Exception:
+            pass
         from ..nlp.service import analyze_note_async
         analyze_note_async(note.id)
         return Response({
@@ -74,6 +79,11 @@ class NotesViewSet(viewsets.ViewSet):
             )
 
         request.user.profile.update_stats()
+        try:
+            from ..nlp.profile_service import invalidate_profile_cache
+            invalidate_profile_cache(request.user.id)
+        except Exception:
+            pass
 
         return Response({
             'id': note.id,
@@ -100,6 +110,11 @@ class NotesViewSet(viewsets.ViewSet):
             )
         
         request.user.profile.update_stats()
+        try:
+            from ..nlp.profile_service import invalidate_profile_cache
+            invalidate_profile_cache(request.user.id)
+        except Exception:
+            pass
         return Response({'message': message}, status=status.HTTP_200_OK)
     
     @action(detail=False, methods=['get'], url_path='deleted')

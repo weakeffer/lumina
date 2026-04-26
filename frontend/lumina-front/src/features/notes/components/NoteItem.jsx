@@ -239,6 +239,19 @@ const NoteItem = ({
             </div>
           )}
 
+          {note.dominant_emotion && note.dominant_emotion !== 'neutral' && (
+            <span
+              className="inline-flex items-center text-xs"
+              title={`Тональность: ${note.dominant_emotion}`}
+            >
+              {({
+                joy: '😊', sadness: '😢', anger: '😠',
+                fear: '😨', surprise: '😲', fatigue: '😴',
+                interest: '🤔', pride: '💪', gratitude: '🙏',
+              })[note.dominant_emotion] || ''}
+            </span>
+          )}
+
           {/* Группа и дата */}
           <div className="flex items-center justify-between mt-2 text-xs">
             <span className={`inline-flex items-center px-2 py-1 rounded-full ${groupColors[groupInfo.color] || groupColors.gray}`}>
