@@ -17,6 +17,8 @@ from natasha import (
 import pymorphy3
 
 from django.conf import settings
+from .neural_emotion_analyzer import detect_emotions_neural, map_neural_to_legacy_emotions
+from .neural_emotion_analyzer import get_emotion_analyzer, NeuralEmotionAnalyzer
 
 MODELS_DIR = os.path.join(settings.BASE_DIR, 'nlp_models')
 
@@ -124,7 +126,7 @@ def _load_models():
             raise RuntimeError(f"Модели не загружены: {_loading_error}")
 
         try:
-            rubert_path = os.path.join(MODELS_DIR, 'rubert-tiny2')
+            rubert_path = os.path.join(MODELS_DIR, 'rubert-tiny2-base')
             minilm_path = os.path.join(MODELS_DIR, 'multilingual-minilm')
 
             # Проверяем наличие моделей
@@ -531,8 +533,26 @@ def _clean_text(text: str) -> str:
     text = re.sub(r'\s+', ' ', text).strip()
     return text[:2000]
 
-
 def _get_sentiment(text: str) -> Tuple[str, float]:
+    """Определяет тональность через нейросеть эмоций (более точно)"""
+    try:
+        analyzer = get_emotion_analyzer()
+        if isinstance(analyzer, NeuralEmotionAnalyzer):
+            scores = analyzer.get_scores_ru(text)
+            # Маппим эмоции в тональность
+            joy_score = scores.get('радость', 0) + scores.get('энтузиазм', 0)
+            sadness_score = scores.get('грусть', 0) + scores.get('гнев', 0) + scores.get('страх', 0)
+            
+            if joy_score > sadness_score + 0.15:
+                return 'positive', joy_score
+            elif sadness_score > joy_score + 0.15:
+                return 'negative', sadness_score
+            else:
+                return 'neutral', 0.5
+    except Exception as e:
+        print(f"[NLP] Ошибка в нейросетевом sentiment: {e}")
+    
+    # Fallback на старую модель (если нейросеть недоступна)
     inputs = _emotion_tokenizer(
         text, return_tensors='pt', truncation=True,
         max_length=512, padding=True
@@ -545,56 +565,32 @@ def _get_sentiment(text: str) -> Tuple[str, float]:
     score = float(probs[pred])
     return label, score
 
-
 def _detect_emotions(text: str, sentiment: str, sentiment_score: float) -> dict:
-    text_lower = text.lower()
-    scores = {}
- 
-    for emotion, keywords in EMOTION_LEXICON.items():
-        hits = 0.0
-        for kw in keywords:
-            kw_escaped = re.escape(kw.lower())
-            # Ищем целое слово/фразу с границами
-            pattern = r'(?<!\w)' + kw_escaped + r'(?!\w)'
-            for match in re.finditer(pattern, text_lower):
-                start = match.start()
-                # Контекст 40 символов слева
-                ctx_start = max(0, start - 40)
-                context = text_lower[ctx_start:start]
- 
-                # Проверяем негаторы в контексте
-                negated = any(
-                    re.search(r'(?<!\w)' + re.escape(neg) + r'(?!\w)', context)
-                    for neg in NEGATORS
-                )
-                if negated:
-                    continue
- 
-                # Проверяем интенсификаторы в контексте
-                intensified = any(
-                    re.search(r'(?<!\w)' + re.escape(inten) + r'(?!\w)', context)
-                    for inten in INTENSIFIERS
-                )
-                hits += 1.5 if intensified else 1.0
- 
-        if hits > 0:
-            scores[emotion] = min(1.0, hits * 0.3 + 0.15)
- 
-    # Усиливаем через sentiment
-    if sentiment == 'positive' and sentiment_score > 0.6:
-        for e in ('joy', 'interest', 'pride', 'gratitude', 'surprise'):
-            if e in scores:
-                scores[e] = min(1.0, scores[e] + 0.2)
-    elif sentiment == 'negative' and sentiment_score > 0.6:
-        for e in ('sadness', 'anger', 'fear', 'fatigue'):
-            if e in scores:
-                scores[e] = min(1.0, scores[e] + 0.2)
- 
-    if not scores:
+    """
+    Определение эмоций с помощью нейросети.
+    Заменяет старый лексиконный подход.
+    """
+    # Получаем эмоции от нейросети (русские названия)
+    neural_scores = detect_emotions_neural(text)
+    
+    # Маппим в старый формат (для совместимости с profile_service)
+    mapped_scores = map_neural_to_legacy_emotions(neural_scores)
+    
+    # Если нейросеть дала слишком низкую уверенность, используем sentiment
+    if mapped_scores:
+        max_score = max(mapped_scores.values())
+        if max_score < 0.3:
+            base = {'positive': 'joy', 'negative': 'sadness', 'neutral': 'neutral'}
+            mapped_scores[base.get(sentiment, 'neutral')] = sentiment_score
+    else:
         base = {'positive': 'joy', 'negative': 'sadness', 'neutral': 'neutral'}
-        scores[base.get(sentiment, 'neutral')] = sentiment_score
- 
-    return dict(sorted(scores.items(), key=lambda x: -x[1])[:6])
+        mapped_scores[base.get(sentiment, 'neutral')] = sentiment_score
+    
+    # Фильтруем только числовые значения (исключаем _ru_raw и другие служебные ключи)
+    numeric_scores = {k: v for k, v in mapped_scores.items() if not k.startswith('_') and isinstance(v, (int, float))}
+    
+    # Сортируем по убыванию и возвращаем топ-8
+    return dict(sorted(numeric_scores.items(), key=lambda x: -x[1])[:8])
 
 def _extract_keywords(text: str) -> List[str]:
     if len(text.split()) < 3:

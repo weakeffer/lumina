@@ -1,0 +1,390 @@
+# backend/lumina/notes/nlp/neural_emotion_analyzer.py
+"""
+Нейросетевой анализатор эмоций на основе ruBERT-tiny2.
+Заменяет лексиконный подход (EMOTION_LEXICON) на настоящую нейросеть.
+"""
+
+import os
+import threading
+import torch
+from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from collections import OrderedDict
+import hashlib
+from django.conf import settings
+
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import numpy as np
+
+MODELS_DIR = os.path.join(settings.BASE_DIR, 'nlp_models')
+
+# ============================================================
+# НАСТРОЙКА МОДЕЛЕЙ
+# ============================================================
+
+# Вариант 1: Aniemore (7 эмоций) — самый точный для базовых эмоций
+# Вариант 2: Seara (28 эмоций) — максимально детальный
+# Вариант 3: CEDR (6 эмоций) — хороший баланс
+
+EMOTION_MODEL_CONFIG = {
+    # Рекомендую начать с этого — отличное качество, простой
+    'aniemore': {
+        'name': 'Aniemore/rubert-tiny2-russian-emotion-detection',
+        'num_labels': 7,
+        'labels': ['neutral', 'happiness', 'sadness', 'enthusiasm', 'fear', 'anger', 'disgust'],
+        'labels_ru': ['нейтрально', 'радость', 'грусть', 'энтузиазм', 'страх', 'гнев', 'отвращение'],
+        'emojis': ['😐', '😊', '😔', '🤩', '😨', '😠', '🤢']
+    },
+    # Расширенная версия — имеет смычку с твоим EMOTION_LEXICON
+    'seara': {
+        'name': 'seara/rubert-tiny2-russian-emotion-detection-ru-go-emotions',
+        'num_labels': 28,
+        'labels': [
+            'admiration', 'amusement', 'anger', 'annoyance', 'approval', 'caring',
+            'confusion', 'curiosity', 'desire', 'disappointment', 'disapproval',
+            'disgust', 'embarrassment', 'excitement', 'fear', 'gratitude', 'grief',
+            'joy', 'love', 'nervousness', 'optimism', 'pride', 'realization',
+            'relief', 'remorse', 'sadness', 'surprise', 'neutral'
+        ],
+        'labels_ru': [
+            'восхищение', 'веселье', 'злость', 'раздражение', 'одобрение', 'забота',
+            'непонимание', 'любопытство', 'желание', 'разочарование', 'неодобрение',
+            'отвращение', 'смущение', 'возбуждение', 'страх', 'благодарность', 'горе',
+            'радость', 'любовь', 'нервозность', 'оптимизм', 'гордость', 'осознание',
+            'облегчение', 'раскаяние', 'грусть', 'удивление', 'нейтрально'
+        ],
+        'emojis': ['👏', '😄', '😠', '😤', '👍', '🤗', '🤔', '🤨', '💭', '😞', '👎',
+                   '🤢', '😳', '🤩', '😨', '🙏', '😢', '😊', '❤️', '😰', '🌟', '🦁',
+                   '💡', '😌', '😔', '😢', '😲', '😐']
+    },
+    # Самый лёгкий и быстрый вариант
+    'cedr': {
+        'name': 'cointegrated/rubert-tiny2-cedr-emotion-detection',
+        'num_labels': 6,
+        'labels': ['joy', 'sadness', 'surprise', 'fear', 'anger', 'no_emotion'],
+        'labels_ru': ['радость', 'грусть', 'удивление', 'страх', 'гнев', 'без эмоций'],
+        'emojis': ['😊', '😔', '😲', '😨', '😠', '😐']
+    }
+}
+
+# Выбери модель (по умолчанию aniemore)
+DEFAULT_MODEL_KEY = 'aniemore'
+
+
+class NeuralEmotionAnalyzer:
+    """
+    Нейросетевой анализатор эмоций.
+    Загружает предобученную модель и предсказывает эмоции для текста.
+    Поддерживает кэширование для повторяющихся текстов.
+    """
+    
+    _instance = None
+    _lock = threading.Lock()
+    
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
+        return cls._instance
+    
+    def __init__(self):
+        if self._initialized:
+            return
+        
+        self.model_key = DEFAULT_MODEL_KEY
+        self.config = EMOTION_MODEL_CONFIG[self.model_key]
+        self.model_name = self.config['name']
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        self.tokenizer = None
+        self.model = None
+        self._cache = OrderedDict()
+        self._cache_max_size = 1000
+        
+        self._load_model()
+        self._initialized = True
+    
+    def _load_model(self):
+        """Загружает модель с HuggingFace или из локальной папки"""
+        model_path = os.path.join(MODELS_DIR, "aniemore-emotions")
+        
+        # Проверяем, есть ли модель локально
+        if os.path.exists(model_path):
+            print(f"[NeuralEmotion] Загрузка модели из {model_path}")
+            self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+            self.model = AutoModelForSequenceClassification.from_pretrained(model_path)
+        else:
+            print(f"[NeuralEmotion] Загрузка модели {self.model_name} из сети...")
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+            self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name)
+        
+        self.model.to(self.device)
+        self.model.eval()
+        print(f"[NeuralEmotion] Модель загружена на {self.device}")
+    
+    def _get_cache_key(self, text: str) -> str:
+        """Генерирует ключ кэша для текста"""
+        return hashlib.md5(text[:500].encode()).hexdigest()
+    
+    def predict(self, text: str) -> Dict[str, float]:
+        """
+        Предсказывает эмоции для текста.
+        Возвращает словарь {emotion_label: score, ...}
+        """
+        if not text or len(text.strip()) < 3:
+            return {'neutral': 1.0}
+        
+        # Проверка кэша
+        cache_key = self._get_cache_key(text)
+        if cache_key in self._cache:
+            # Перемещаем в конец (LRU)
+            value = self._cache.pop(cache_key)
+            self._cache[cache_key] = value
+            return value
+        
+        # Токенизация
+        inputs = self.tokenizer(
+            text,
+            return_tensors='pt',
+            truncation=True,
+            max_length=512,
+            padding=True
+        )
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        
+        # Инференс
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+            probs = torch.softmax(outputs.logits, dim=1)
+        
+        # Формируем результат
+        scores = {
+            label: float(probs[0][i])
+            for i, label in enumerate(self.config['labels'])
+        }
+        
+        # Сортируем по убыванию
+        scores = dict(sorted(scores.items(), key=lambda x: -x[1]))
+        
+        # Кэшируем
+        self._cache[cache_key] = scores
+        # Ограничиваем размер кэша
+        while len(self._cache) > self._cache_max_size:
+            self._cache.popitem(last=False)
+        
+        return scores
+    
+    def predict_batch(self, texts: List[str]) -> List[Dict[str, float]]:
+        """
+        Пакетное предсказание для нескольких текстов.
+        """
+        if not texts:
+            return []
+        
+        results = []
+        for text in texts:
+            results.append(self.predict(text))
+        return results
+    
+    def get_dominant_emotion(self, text: str) -> Tuple[str, float]:
+        """
+        Возвращает доминирующую эмоцию и её score.
+        """
+        scores = self.predict(text)
+        dominant = max(scores.items(), key=lambda x: x[1])
+        return dominant[0], dominant[1]
+    
+    def get_dominant_emotion_ru(self, text: str) -> Tuple[str, float, str]:
+        """
+        Возвращает (русское_название, score, emoji)
+        """
+        eng_label, score = self.get_dominant_emotion(text)
+        
+        # Маппинг для разных моделей
+        label_to_ru = {}
+        for i, eng in enumerate(self.config['labels']):
+            if i < len(self.config['labels_ru']):
+                label_to_ru[eng] = self.config['labels_ru'][i]
+            else:
+                label_to_ru[eng] = eng
+        
+        ru_label = label_to_ru.get(eng_label, eng_label)
+        
+        # Эмодзи
+        emoji = '😐'
+        for i, eng in enumerate(self.config['labels']):
+            if eng == eng_label and i < len(self.config['emojis']):
+                emoji = self.config['emojis'][i]
+                break
+        
+        return ru_label, score, emoji
+    
+    def get_scores_ru(self, text: str) -> Dict[str, float]:
+        """
+        Возвращает эмоции с русскими названиями.
+        """
+        eng_scores = self.predict(text)
+        
+        label_to_ru = {}
+        for i, eng in enumerate(self.config['labels']):
+            if i < len(self.config['labels_ru']):
+                label_to_ru[eng] = self.config['labels_ru'][i]
+            else:
+                label_to_ru[eng] = eng
+        
+        return {label_to_ru[eng]: score for eng, score in eng_scores.items()}
+
+
+# ============================================================
+# ФАЛЛБЕК: лексиконный анализатор (если нейросеть не доступна)
+# ============================================================
+
+# Базовый словарь эмоций для fallback
+FALLBACK_EMOTION_LEXICON = {
+    'радость': ['радость', 'счастье', 'восторг', 'отлично', 'классно', 'круто', 'огонь', 'хорошо', 'прекрасно'],
+    'грусть': ['грусть', 'печаль', 'тоска', 'расстроен', 'грустно', 'жаль'],
+    'злость': ['злость', 'ярость', 'бешенство', 'раздражение', 'бесит', 'достало'],
+    'страх': ['страх', 'тревога', 'боюсь', 'страшно', 'тревожно', 'нервничаю'],
+    'удивление': ['удивление', 'неожиданно', 'вау', 'поразительно'],
+    'усталость': ['устал', 'усталость', 'выгорание', 'тяжело', 'вымотан'],
+    'интерес': ['интересно', 'любопытно', 'захватывает', 'увлекательно'],
+    'спокойствие': ['нормально', 'спокойно', 'ровно', 'уютно', 'хорошее']
+}
+
+
+class LexiconEmotionAnalyzer:
+    """Фаллбек-анализатор на основе словаря (если нейросеть недоступна)"""
+    
+    def predict(self, text: str) -> Dict[str, float]:
+        text_lower = text.lower()
+        scores = {}
+        
+        for emotion, keywords in FALLBACK_EMOTION_LEXICON.items():
+            hits = 0
+            for kw in keywords:
+                if kw in text_lower:
+                    hits += 1
+            if hits > 0:
+                scores[emotion] = min(1.0, hits * 0.2)
+        
+        if not scores:
+            scores['нейтрально'] = 0.8
+        
+        return scores
+    
+    def get_dominant_emotion(self, text: str) -> Tuple[str, float]:
+        scores = self.predict(text)
+        dominant = max(scores.items(), key=lambda x: x[1])
+        return dominant[0], dominant[1]
+
+
+# ============================================================
+# ЕДИНЫЙ ИНТЕРФЕЙС
+# ============================================================
+
+_neural_analyzer = None
+_lexicon_analyzer = LexiconEmotionAnalyzer()
+_use_neural = True
+
+
+def get_emotion_analyzer():
+    """Возвращает доступный анализатор эмоций"""
+    global _neural_analyzer, _use_neural
+    
+    if _use_neural:
+        try:
+            if _neural_analyzer is None:
+                _neural_analyzer = NeuralEmotionAnalyzer()
+            # Проверяем, что модель действительно загружена
+            if _neural_analyzer.model is not None:
+                return _neural_analyzer
+            else:
+                _use_neural = False
+        except Exception as e:
+            print(f"[EmotionAnalyzer] Нейросеть недоступна: {e}. Использую лексикон.")
+            _use_neural = False
+    
+    return _lexicon_analyzer
+
+
+def detect_emotions_neural(text: str) -> Dict[str, float]:
+    """
+    Определяет эмоции с помощью нейросети.
+    Возвращает словарь эмоция -> вероятность.
+    """
+    analyzer = get_emotion_analyzer()
+    
+    if isinstance(analyzer, NeuralEmotionAnalyzer):
+        # Для нейросети возвращаем русские названия
+        return analyzer.get_scores_ru(text)
+    else:
+        # Для лексикона уже русские
+        return analyzer.predict(text)
+
+
+def get_dominant_emotion_neural(text: str) -> Tuple[str, float, str]:
+    """
+    Возвращает (название_эмоции, score, emoji)
+    """
+    analyzer = get_emotion_analyzer()
+    
+    if isinstance(analyzer, NeuralEmotionAnalyzer):
+        return analyzer.get_dominant_emotion_ru(text)
+    else:
+        emotion, score = analyzer.get_dominant_emotion(text)
+        # Простой маппинг эмодзи для лексикона
+        emoji_map = {
+            'радость': '😊', 'грусть': '😔', 'злость': '😠', 'страх': '😨',
+            'удивление': '😲', 'усталость': '😴', 'интерес': '🤔', 'спокойствие': '😐',
+            'нейтрально': '😐'
+        }
+        return emotion, score, emoji_map.get(emotion, '😐')
+
+
+# Для обратной совместимости с analyzer.py
+def map_neural_to_legacy_emotions(neural_scores: Dict[str, float]) -> Dict[str, float]:
+    """
+    Маппит эмоции из нейросети в старый формат (joy, sadness, anger, etc.)
+    """
+    legacy = {}
+    
+    # Маппинг правил (можно расширять)
+    mapping = {
+        'радость': 'joy',
+        'счастье': 'joy',
+        'энтузиазм': 'joy',
+        'грусть': 'sadness',
+        'горе': 'sadness',
+        'злость': 'anger',
+        'гнев': 'anger',
+        'раздражение': 'anger',
+        'страх': 'fear',
+        'тревога': 'fear',
+        'удивление': 'surprise',
+        'усталость': 'fatigue',
+        'интерес': 'interest',
+        'любопытство': 'interest',
+        'гордость': 'pride',
+        'благодарность': 'gratitude',
+        'спокойствие': 'neutral',
+        'нейтрально': 'neutral'
+    }
+    
+    for neural_emotion, score in neural_scores.items():
+        legacy_emotion = mapping.get(neural_emotion)
+        if legacy_emotion:
+            if legacy_emotion not in legacy:
+                legacy[legacy_emotion] = 0
+            legacy[legacy_emotion] = max(legacy[legacy_emotion], score)
+    
+    # Нормализуем, чтобы сумма была ~1
+    total = sum(legacy.values())
+    if total > 0:
+        legacy = {k: v / total for k, v in legacy.items()}
+    
+    if not legacy:
+        legacy['neutral'] = 1.0
+    
+    return legacy
