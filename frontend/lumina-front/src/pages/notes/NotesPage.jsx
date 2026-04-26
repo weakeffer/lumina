@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useTheme } from '../../shared/context/ThemeContext';
 import { useViewMode } from '../../shared/context/ViewModeContext';
 import { VIEW_MODES } from '../../features/profile/constants';
+import { EMOTION_EMOJI } from '../../features/notes/hooks/useAnalysisToast';
 import AppLayout from '../../features/notes/components/AppLayout';
 import NoteSidebar from '../../features/notes/components/NoteSidebar'; 
 import NoteEditor from '../../features/notes/components/NoteEditor';
@@ -21,6 +22,7 @@ import { useGroupsWithNotes, useGroupMutations } from '../../features/notes/hook
 import { useTags } from '../../features/notes/hooks/useTags';
 import { useNoteUI } from '../../features/notes/hooks/useNoteUI';
 import { useNoteFilters } from '../../features/notes/hooks/useNoteFilters';
+import { useAnalysisToast } from '../../features/notes/hooks/useAnalysisToast';
 import NoteList from '../../features/notes/components/NoteList/NoteList';
 import Header from '../../features/notes/components/Common/Header';
 import Footer from '../../features/notes/components/Common/Footer';
@@ -140,6 +142,10 @@ const NotesPage = () => {
     notes.find(n => n.id === uiState.selectedNoteId),
     [notes, uiState.selectedNoteId]
   );
+
+  useAnalysisToast(selectedNote?.id, (emotion) => {
+    showNotification(`Анализ готов ${EMOTION_EMOJI[emotion] || '🧠'}`, 'info');
+  });
 
   // Группировка заметок для сайдбара (только для sidebar режима)
   const groupedNotesForSidebar = useMemo(() => {

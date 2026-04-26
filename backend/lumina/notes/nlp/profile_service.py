@@ -490,3 +490,96 @@ def _most_active_hour(analyses) -> int:
     for a in analyses:
         hours[a.note.created_at.hour] += 1
     return max(hours, key=hours.get) if hours else 12
+
+def get_traits_timeline(user_id: int) -> dict:
+    """
+    Строит помесячную историю психологических черт.
+    Возвращает данные для графика динамики.
+    
+    Структура возврата:
+    {
+        'has_data': bool,
+        'months': ['2025-11', '2025-12', '2026-01', ...],
+        'traits': {
+            'Открытость к новому': [0.4, 0.55, 0.6, ...],
+            'Позитивность': [0.3, 0.45, 0.7, ...],
+            ...
+        }
+    }
+    """
+    from ..models import NoteAnalysis
+    import math
+    from collections import defaultdict
+ 
+    cache_key = f"traits_timeline_{user_id}"
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+ 
+    analyses = NoteAnalysis.objects.filter(
+        note__user_id=user_id,
+        note__is_deleted=False,
+        is_analyzed=True,
+    ).select_related('note').order_by('note__created_at')
+ 
+    if analyses.count() < 3:
+        result = {'has_data': False}
+        cache.set(cache_key, result, PROFILE_CACHE_TTL)
+        return result
+ 
+    # Группируем по месяцам
+    months_data = defaultdict(list)
+    for a in analyses:
+        month_key = a.note.created_at.strftime('%Y-%m')
+        months_data[month_key].append(a)
+ 
+    # Нужно минимум 2 месяца для динамики
+    sorted_months = sorted(months_data.keys())
+    if len(sorted_months) < 2:
+        result = {'has_data': False}
+        cache.set(cache_key, result, PROFILE_CACHE_TTL)
+        return result
+ 
+    traits_over_time = defaultdict(list)
+ 
+    for month in sorted_months:
+        month_analyses = months_data[month]
+        total = len(month_analyses)
+ 
+        # ── Открытость: разнообразие тем ──────────────────────────────
+        all_topics = [t for a in month_analyses for t in a.topics]
+        unique = len(set(all_topics))
+        openness = min(1.0, unique / max(total * 2, 1))
+        traits_over_time['Открытость'].append(round(openness, 3))
+ 
+        # ── Позитивность ───────────────────────────────────────────────
+        pos = sum(1 for a in month_analyses if a.sentiment == 'positive')
+        positivity = round(pos / total, 3)
+        traits_over_time['Позитивность'].append(positivity)
+ 
+        # ── Рефлексивность: средняя длина записей ─────────────────────
+        avg_words = sum(
+            a.text_stats.get('word_count', 0) for a in month_analyses
+        ) / total
+        reflectivity = round(min(1.0, avg_words / 200), 3)
+        traits_over_time['Рефлексивность'].append(reflectivity)
+ 
+        # ── Эмоциональность: интенсивность эмоций ────────────────────
+        avg_intensity = sum(
+            max(a.emotions.values(), default=0) for a in month_analyses
+        ) / total
+        emotionality = round(min(1.0, avg_intensity), 3)
+        traits_over_time['Эмоциональность'].append(emotionality)
+ 
+        # ── Регулярность: заметок в этом месяце ──────────────────────
+        # Нормируем: 30 заметок в месяц = 1.0
+        regularity = round(min(1.0, total / 30), 3)
+        traits_over_time['Регулярность'].append(regularity)
+ 
+    result = {
+        'has_data': True,
+        'months': sorted_months,
+        'traits': dict(traits_over_time),
+    }
+    cache.set(cache_key, result, PROFILE_CACHE_TTL)
+    return result

@@ -964,4 +964,11 @@ export const api = {
         });
         return response.json();
     },
+    async getTraitsTimeline() {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_URL}/api/notes/traits-timeline/`, {
+          headers: { Authorization: `Token ${token}` },
+        });
+        return res.json();
+    },
 };

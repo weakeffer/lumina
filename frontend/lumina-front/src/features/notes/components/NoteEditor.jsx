@@ -10,7 +10,7 @@ import {
   BookOpen, BookMarked, Bookmark, Pin, Archive, Tag, ChevronLeft, ChevronRight, X,
   GripVertical
 } from 'lucide-react';
-import { Image as ImageIcon } from 'lucide-react';
+import { Image as ImageIcon, Brain } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import EmojiPicker from 'emoji-picker-react';
 import remarkGfm from 'remark-gfm';
@@ -18,6 +18,7 @@ import remarkBreaks from 'remark-breaks';
 import rehypeRaw from 'rehype-raw';
 import { useTheme } from '../../../shared/context/ThemeContext';
 import ImageUploader from './ImageUploader';
+import NoteAnalysisPanel from './NoteAnalysisPanel';
 import { api } from '../../../shared/api/api';
 
 const CodeBlock = ({ language, value }) => {
@@ -204,6 +205,7 @@ const NoteEditor = ({ note, onUpdate }) => {
   const maxHistorySize = 100;
   const [showImageUploader, setShowImageUploader] = useState(false);
   const [uploadedImages, setUploadedImages] = useState([]);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const applyFormatting = (type, value) => {
     if (!textareaRef.current) return;
 
@@ -1854,6 +1856,18 @@ const NoteEditor = ({ note, onUpdate }) => {
             >
               <Download className="w-4 h-4" />
             </button>
+            
+            <button
+              onClick={() => setShowAnalysis(!showAnalysis)}
+              className={`p-2 rounded-lg transition-colors ${
+                showAnalysis
+                  ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-500'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+              title="Анализ заметки"
+            >
+              <Brain className="w-4 h-4" />
+            </button>
 
             <button
               onClick={() => setViewMode('edit')}
@@ -1999,7 +2013,13 @@ const NoteEditor = ({ note, onUpdate }) => {
           noteId={note?.id}
         />
       )}
-
+      {showAnalysis && (
+        <NoteAnalysisPanel
+          noteId={note?.id}
+          visible={showAnalysis}
+          onClose={() => setShowAnalysis(false)}
+        />
+      )}
     </div>
   );
 };

@@ -33,3 +33,11 @@ export const useAnalyzeNote = () => {
         },
     });
 };
+
+export const useTraitsTimeline = () => {
+  return useQuery({
+    queryKey: ['traits-timeline'],
+    queryFn: () => api.getTraitsTimeline(),
+    staleTime: 10 * 60_000,
+  });
+};

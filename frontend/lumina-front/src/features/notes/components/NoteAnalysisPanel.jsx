@@ -263,48 +263,6 @@ function NarrativeBlock({ narrative }) {
   );
 }
 
-// ── Главный компонент ──────────────────────────────────────────────────
-
-/**
- * NoteAnalysisPanel
- *
- * Пропсы:
- *   noteId   — ID текущей заметки
- *   visible  — показывать ли панель (управляется кнопкой в NoteEditor)
- *   onClose  — callback скрытия
- *
- * Использование в NoteEditor.jsx:
- *
- *   import NoteAnalysisPanel from './NoteAnalysisPanel';
- *
- *   // добавить state:
- *   const [showAnalysis, setShowAnalysis] = useState(false);
- *
- *   // кнопка в тулбаре (рядом с кнопками Edit/Split/Preview):
- *   <button
- *     onClick={() => setShowAnalysis(!showAnalysis)}
- *     className={`p-2 rounded-lg transition-colors ${
- *       showAnalysis
- *         ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-500'
- *         : 'hover:bg-gray-100 dark:hover:bg-gray-700'
- *     }`}
- *     title="Анализ заметки"
- *   >
- *     <Brain className="w-4 h-4" />
- *   </button>
- *
- *   // в JSX разметке, рядом с основным flex-контейнером редактора:
- *   <div className="flex-1 flex overflow-hidden">
- *     // ... существующий код редактора ...
- *     {showAnalysis && (
- *       <NoteAnalysisPanel
- *         noteId={note?.id}
- *         visible={showAnalysis}
- *         onClose={() => setShowAnalysis(false)}
- *       />
- *     )}
- *   </div>
- */
 const NoteAnalysisPanel = ({ noteId, visible, onClose }) => {
   const { themeClasses } = useTheme();
   const { data, loading, triggerAnalysis } = useNoteAnalysis(noteId);

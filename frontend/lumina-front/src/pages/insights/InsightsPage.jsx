@@ -1,12 +1,16 @@
 // frontend/lumina-front/src/pages/insights/InsightsPage.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useNotes } from '../../features/notes/hooks/useNotes';
 import { useTheme } from '../../shared/context/ThemeContext';
 import { usePersonalityProfile } from '../../features/notes/hooks/usePersonalityProfile';
+import { useTraitsTimeline } from '../../features/notes/hooks/useAnalysis';
 import { useDailySummary } from '../../features/notes/hooks/useAnalysis';
+import InsightsOnboarding from './InsightsOnboarding';
+import TraitsTimeline from './TraitsTimeline';
 import { api } from '../../shared/api/api';
 import {
-  ChevronLeft, Brain, TrendingUp, Calendar, Zap,
+  Activity, ChevronLeft, Brain, TrendingUp, Calendar, Zap,
   Star, Heart, Clock, Sun, Cloud, CloudRain, Smile,
   Meh, Frown, ChevronRight, BarChart2
 } from 'lucide-react';
@@ -39,6 +43,7 @@ const EMOTION_META = {
 
 export default function InsightsPage() {
   const navigate = useNavigate();
+  const notesCount = useNotes();
   const { themeClasses, theme } = useTheme();
   const [activeSection, setActiveSection] = useState('overview');
   const [selectedDate, setSelectedDate] = useState(
@@ -75,6 +80,7 @@ export default function InsightsPage() {
     { id: 'mood',      label: 'Настроение',  icon: TrendingUp },
     { id: 'topics',    label: 'Темы',        icon: Zap },
     { id: 'traits',    label: 'Черты',       icon: Star },
+    { id: 'dynamics', label: 'Динамика', icon: Activity },
   ];
 
   return (
@@ -180,6 +186,9 @@ export default function InsightsPage() {
             )}
             {activeSection === 'traits' && (
               <TraitsSection profile={profile} themeClasses={themeClasses} />
+            )}
+            {activeSection === 'dynamics' && (
+              <TraitsTimeline isDark={isDark} themeClasses={themeClasses} />
             )}
           </>
         )}
@@ -1181,19 +1190,7 @@ function LoadingState() {
 }
 
 function EmptyState() {
-  return (
-    <div className="flex items-center justify-center py-32">
-      <div className="text-center max-w-sm">
-        <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center mx-auto mb-4">
-          <Brain className="w-8 h-8 text-indigo-500 opacity-50" />
-        </div>
-        <p className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Пока нет данных
-        </p>
-        <p className="text-sm text-gray-400">
-          Напиши несколько заметок и дай ИИ их проанализировать — карта личности появится автоматически
-        </p>
-      </div>
-    </div>
-  );
+  {!profileLoading && !profile?.has_data && (
+    <InsightsOnboarding notesCount={notesCount} />
+  )}
 }

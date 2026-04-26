@@ -370,6 +370,13 @@ class NotesViewSet(viewsets.ViewSet):
         from ..nlp.profile_service import get_personality_profile
         profile = get_personality_profile(request.user.id)
         return Response(profile)
+    
+    @action(detail=False, methods=['get'], url_path='traits-timeline')
+    def traits_timeline(self, request):
+        """Помесячная динамика психологических черт"""
+        from ..nlp.profile_service import get_traits_timeline
+        data = get_traits_timeline(request.user.id)
+        return Response(data)
 
 
 class NoteGroupViewSet(viewsets.ViewSet):
