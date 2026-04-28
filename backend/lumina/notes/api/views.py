@@ -42,14 +42,8 @@ class NotesViewSet(viewsets.ViewSet):
     def create(self, request):
         dto = CreateNoteDTO.from_request(request.data)
         note, message = self.note_service.create_note(request.user.id, dto)
-        request.user.profile.update_stats()
-        try:
-            from ..nlp.profile_service import invalidate_profile_cache
-            invalidate_profile_cache(request.user.id)
-        except Exception:
-            pass
-        from ..nlp.service import analyze_note_async
-        analyze_note_async(note.id)
+        # Статистика и анализ теперь запускаются через signals.py
+        
         return Response({
             'message': message,
             'id': note.id,
@@ -70,21 +64,14 @@ class NotesViewSet(viewsets.ViewSet):
     def _update_note(self, pk, request):
         dto = UpdateNoteDTO.from_request(request.data)
         note, message = self.note_service.update_note(int(pk), request.user.id, dto)
-        analyze_note_async(int(pk))
+        # Статистика и анализ теперь запускаются через signals.py
         
         if not note:
             return Response(
                 {'error': message},
                 status=status.HTTP_404_NOT_FOUND
             )
-
-        request.user.profile.update_stats()
-        try:
-            from ..nlp.profile_service import invalidate_profile_cache
-            invalidate_profile_cache(request.user.id)
-        except Exception:
-            pass
-
+    
         return Response({
             'id': note.id,
             'title': note.title,
@@ -99,7 +86,7 @@ class NotesViewSet(viewsets.ViewSet):
             'group_color': note.group_color,
             'deleted_at': note.deleted_at
         })
-
+    
     def destroy(self, request, pk=None):
         success, message = self.note_service.delete_note(int(pk), request.user.id)
         

@@ -155,7 +155,9 @@ export default function InsightsPage() {
       {/* Content */}
       <div className="max-w-6xl mx-auto px-6 py-8">
         {profileLoading && <LoadingState />}
-        {!profileLoading && !profile?.has_data && <EmptyState />}
+        {!profileLoading && !profile?.has_data && (
+          <EmptyState notesCount={notes?.length ?? 0} />
+        )}
         {!profileLoading && profile?.has_data && (
           <>
             {activeSection === 'overview' && (
@@ -1189,8 +1191,6 @@ function LoadingState() {
   );
 }
 
-function EmptyState() {
-  {!profileLoading && !profile?.has_data && (
-    <InsightsOnboarding notesCount={notesCount} />
-  )}
+function EmptyState({ notesCount = 0 }) {
+  return <InsightsOnboarding notesCount={notesCount} />;
 }

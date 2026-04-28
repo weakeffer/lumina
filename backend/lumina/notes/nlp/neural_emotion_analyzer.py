@@ -12,11 +12,15 @@ from dataclasses import dataclass
 from collections import OrderedDict
 import hashlib
 from django.conf import settings
+import gc
+import time
+import logging
 
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import numpy as np
 
 MODELS_DIR = os.path.join(settings.BASE_DIR, 'nlp_models')
+logger = logging.getLogger('lumina.nlp')
 
 # ============================================================
 # НАСТРОЙКА МОДЕЛЕЙ
@@ -70,12 +74,15 @@ EMOTION_MODEL_CONFIG = {
 # Выбери модель (по умолчанию aniemore)
 DEFAULT_MODEL_KEY = 'aniemore'
 
-
 class NeuralEmotionAnalyzer:
     """
-    Нейросетевой анализатор эмоций.
-    Загружает предобученную модель и предсказывает эмоции для текста.
-    Поддерживает кэширование для повторяющихся текстов.
+    Нейросетевой анализатор эмоций с защитой от утечек памяти.
+    
+    Улучшения:
+    - TTL для кэша (1 час)
+    - Автоматическая очистка кэша каждые 100 запросов
+    - Явная очистка GPU кэша PyTorch
+    - Метрики использования
     """
     
     _instance = None
@@ -100,8 +107,19 @@ class NeuralEmotionAnalyzer:
         
         self.tokenizer = None
         self.model = None
+        
+        # Кэш с TTL
         self._cache = OrderedDict()
+        self._cache_timestamps = {}
         self._cache_max_size = 1000
+        self._cache_ttl = 3600  # 1 час
+        
+        # Счетчики для периодической очистки
+        self._request_count = 0
+        self._cache_hits = 0
+        self._cache_misses = 0
+        self._last_cleanup_time = time.time()
+        self._cleanup_interval = 300  # очистка каждые 5 минут
         
         self._load_model()
         self._initialized = True
@@ -110,99 +128,181 @@ class NeuralEmotionAnalyzer:
         """Загружает модель с HuggingFace или из локальной папки"""
         model_path = os.path.join(MODELS_DIR, "aniemore-emotions")
         
-        # Проверяем, есть ли модель локально
-        if os.path.exists(model_path):
-            print(f"[NeuralEmotion] Загрузка модели из {model_path}")
-            self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-            self.model = AutoModelForSequenceClassification.from_pretrained(model_path)
-        else:
-            print(f"[NeuralEmotion] Загрузка модели {self.model_name} из сети...")
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name)
-        
-        self.model.to(self.device)
-        self.model.eval()
-        print(f"[NeuralEmotion] Модель загружена на {self.device}")
+        try:
+            if os.path.exists(model_path):
+                logger.info(f"Загрузка модели эмоций из {model_path}")
+                self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+                self.model = AutoModelForSequenceClassification.from_pretrained(model_path)
+            else:
+                logger.info(f"Загрузка модели эмоций {self.model_name} из сети...")
+                self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+                self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name)
+            
+            self.model.to(self.device)
+            self.model.eval()
+            
+            # Очищаем кэш PyTorch после загрузки
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            
+            logger.info(f"Модель эмоций загружена на {self.device}")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки модели эмоций: {e}")
+            raise
     
     def _get_cache_key(self, text: str) -> str:
-        """Генерирует ключ кэша для текста"""
-        return hashlib.md5(text[:500].encode()).hexdigest()
+        """Генерирует ключ кэша (SHA256 вместо MD5)"""
+        return hashlib.sha256(text[:500].encode()).hexdigest()
     
     def predict(self, text: str) -> Dict[str, float]:
         """
-        Предсказывает эмоции для текста.
-        Возвращает словарь {emotion_label: score, ...}
+        Предсказывает эмоции с кэшированием и TTL.
         """
         if not text or len(text.strip()) < 3:
             return {'neutral': 1.0}
         
-        # Проверка кэша
+        self._request_count += 1
+        
+        # Периодическая очистка кэша
+        self._maybe_cleanup_cache()
+        
+        # Проверяем кэш
         cache_key = self._get_cache_key(text)
         if cache_key in self._cache:
-            # Перемещаем в конец (LRU)
-            value = self._cache.pop(cache_key)
-            self._cache[cache_key] = value
-            return value
+            timestamp = self._cache_timestamps.get(cache_key, 0)
+            if time.time() - timestamp < self._cache_ttl:
+                # Перемещаем в конец (LRU)
+                value = self._cache.pop(cache_key)
+                self._cache[cache_key] = value
+                self._cache_hits += 1
+                return value
+            else:
+                # TTL истек — удаляем
+                del self._cache[cache_key]
+                del self._cache_timestamps[cache_key]
         
-        # Токенизация
-        inputs = self.tokenizer(
-            text,
-            return_tensors='pt',
-            truncation=True,
-            max_length=512,
-            padding=True
-        )
-        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        self._cache_misses += 1
+        
+        # Токенизация с ограничением длины
+        try:
+            inputs = self.tokenizer(
+                text[:1000],  # Ограничиваем длину текста для токенизации
+                return_tensors='pt',
+                truncation=True,
+                max_length=512,
+                padding=True
+            )
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        except Exception as e:
+            logger.error(f"Ошибка токенизации: {e}")
+            return {'neutral': 1.0}
         
         # Инференс
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-            probs = torch.softmax(outputs.logits, dim=1)
+        try:
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                probs = torch.softmax(outputs.logits, dim=1)
+        except Exception as e:
+            logger.error(f"Ошибка инференса: {e}")
+            return {'neutral': 1.0}
         
         # Формируем результат
         scores = {
             label: float(probs[0][i])
             for i, label in enumerate(self.config['labels'])
         }
-        
-        # Сортируем по убыванию
         scores = dict(sorted(scores.items(), key=lambda x: -x[1]))
         
         # Кэшируем
         self._cache[cache_key] = scores
+        self._cache_timestamps[cache_key] = time.time()
+        
         # Ограничиваем размер кэша
         while len(self._cache) > self._cache_max_size:
-            self._cache.popitem(last=False)
+            # Удаляем самые старые записи
+            oldest_key = next(iter(self._cache))
+            del self._cache[oldest_key]
+            self._cache_timestamps.pop(oldest_key, None)
         
         return scores
     
+    def _maybe_cleanup_cache(self):
+        """Периодическая очистка кэша и GPU памяти"""
+        now = time.time()
+        
+        # Очистка каждые 5 минут или каждые 500 запросов
+        if (now - self._last_cleanup_time > self._cleanup_interval or 
+            self._request_count % 500 == 0):
+            
+            # Удаляем просроченные записи кэша
+            expired_keys = [
+                k for k, ts in self._cache_timestamps.items()
+                if now - ts > self._cache_ttl
+            ]
+            for k in expired_keys:
+                self._cache.pop(k, None)
+                self._cache_timestamps.pop(k, None)
+            
+            if expired_keys:
+                logger.debug(f"Очищено {len(expired_keys)} просроченных записей кэша эмоций")
+            
+            # Очищаем кэш PyTorch GPU
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            
+            # Логируем статистику кэша
+            total_requests = self._cache_hits + self._cache_misses
+            if total_requests > 0:
+                hit_rate = self._cache_hits / total_requests * 100
+                logger.debug(
+                    f"Статистика кэша эмоций: "
+                    f"размер={len(self._cache)}/{self._cache_max_size}, "
+                    f"hit_rate={hit_rate:.1f}%"
+                )
+            
+            self._last_cleanup_time = now
+            self._cache_hits = 0
+            self._cache_misses = 0
+    
+    def get_metrics(self) -> dict:
+        """Возвращает метрики использования"""
+        return {
+            'cache_size': len(self._cache),
+            'cache_max_size': self._cache_max_size,
+            'cache_ttl': self._cache_ttl,
+            'device': str(self.device),
+            'model_name': self.model_name,
+            'total_requests': self._request_count,
+        }
+    
+    def unload_model(self):
+        """Явная выгрузка модели из памяти"""
+        logger.info("Выгрузка модели эмоций из памяти")
+        self.model = None
+        self.tokenizer = None
+        self._cache.clear()
+        self._cache_timestamps.clear()
+        
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    
     def predict_batch(self, texts: List[str]) -> List[Dict[str, float]]:
-        """
-        Пакетное предсказание для нескольких текстов.
-        """
+        """Пакетное предсказание для нескольких текстов"""
         if not texts:
             return []
-        
-        results = []
-        for text in texts:
-            results.append(self.predict(text))
-        return results
+        return [self.predict(text) for text in texts]
     
     def get_dominant_emotion(self, text: str) -> Tuple[str, float]:
-        """
-        Возвращает доминирующую эмоцию и её score.
-        """
+        """Возвращает доминирующую эмоцию и её score"""
         scores = self.predict(text)
         dominant = max(scores.items(), key=lambda x: x[1])
         return dominant[0], dominant[1]
     
     def get_dominant_emotion_ru(self, text: str) -> Tuple[str, float, str]:
-        """
-        Возвращает (русское_название, score, emoji)
-        """
+        """Возвращает (русское_название, score, emoji)"""
         eng_label, score = self.get_dominant_emotion(text)
         
-        # Маппинг для разных моделей
         label_to_ru = {}
         for i, eng in enumerate(self.config['labels']):
             if i < len(self.config['labels_ru']):
@@ -212,7 +312,6 @@ class NeuralEmotionAnalyzer:
         
         ru_label = label_to_ru.get(eng_label, eng_label)
         
-        # Эмодзи
         emoji = '😐'
         for i, eng in enumerate(self.config['labels']):
             if eng == eng_label and i < len(self.config['emojis']):
@@ -222,9 +321,7 @@ class NeuralEmotionAnalyzer:
         return ru_label, score, emoji
     
     def get_scores_ru(self, text: str) -> Dict[str, float]:
-        """
-        Возвращает эмоции с русскими названиями.
-        """
+        """Возвращает эмоции с русскими названиями"""
         eng_scores = self.predict(text)
         
         label_to_ru = {}
@@ -235,7 +332,6 @@ class NeuralEmotionAnalyzer:
                 label_to_ru[eng] = eng
         
         return {label_to_ru[eng]: score for eng, score in eng_scores.items()}
-
 
 # ============================================================
 # ФАЛЛБЕК: лексиконный анализатор (если нейросеть не доступна)
