@@ -118,6 +118,12 @@ REST_FRAMEWORK = {
     ],
 }
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Разрешаем все только в режиме разработки
+if not CORS_ALLOW_ALL_ORIGINS:
+    _cors_origins = os.getenv(
+        'CORS_ALLOWED_ORIGINS',
+        'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000',
+    )
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(',') if o.strip()]
 
 # Media files
 MEDIA_URL = '/media/'

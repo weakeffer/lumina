@@ -297,6 +297,17 @@ class NotesViewSet(viewsets.ViewSet):
         note = self.note_service.get_note_detail(int(pk), request.user.id)
         if not note:
             return Response({'error': 'Заметка не найдена'}, status=404)
+
+        # Принудительно сбрасываем флаг, чтобы заметка переанализировалась.
+        # Иначе _run_analysis_sync пропустит уже проанализированную запись.
+        analysis, _ = NoteAnalysis.objects.get_or_create(
+            note_id=int(pk),
+            defaults={'is_analyzed': False}
+        )
+        if analysis.is_analyzed:
+            analysis.is_analyzed = False
+            analysis.save(update_fields=['is_analyzed', 'analyzed_at'])
+
         analyze_note_async(int(pk))
         return Response({'message': 'Анализ запущен', 'note_id': pk})
  
@@ -308,7 +319,7 @@ class NotesViewSet(viewsets.ViewSet):
                 note_id=int(pk),
                 note__user_id=request.user.id,
             )
-            return Response({
+            payload = {
                 'note_id': pk,
                 'is_analyzed': analysis.is_analyzed,
                 'sentiment': analysis.sentiment,
@@ -321,7 +332,22 @@ class NotesViewSet(viewsets.ViewSet):
                 'text_stats': analysis.text_stats,
                 'narrative': analysis.narrative,
                 'analyzed_at': analysis.analyzed_at.isoformat(),
-            })
+            }
+
+            # Отладочный режим: /analysis/?debug=1
+            if settings.DEBUG and request.query_params.get('debug') == '1':
+                payload['debug'] = {
+                    'note_id': int(pk),
+                    'is_analyzed': analysis.is_analyzed,
+                    'dominant_emotion': analysis.dominant_emotion,
+                    'top_emotions': sorted(
+                        list((analysis.emotions or {}).items()),
+                        key=lambda x: -x[1]
+                    )[:5],
+                    'emotion_debug': (analysis.text_stats or {}).get('emotion_debug', {}),
+                }
+
+            return Response(payload)
         except NoteAnalysis.DoesNotExist:
             return Response({'is_analyzed': False, 'note_id': pk})
  

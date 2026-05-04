@@ -1,6 +1,4 @@
-import { api } from '../../../shared/api/api';
-
-const API_URL = 'http://localhost:8000';
+import { API_URL } from '../../../shared/config';
 
 export const profileApi = {
 

@@ -43,7 +43,7 @@ const EMOTION_META = {
 
 export default function InsightsPage() {
   const navigate = useNavigate();
-  const notesCount = useNotes();
+  const { data: notes = [] } = useNotes();
   const { themeClasses, theme } = useTheme();
   const [activeSection, setActiveSection] = useState('overview');
   const [selectedDate, setSelectedDate] = useState(
@@ -156,7 +156,7 @@ export default function InsightsPage() {
       <div className="max-w-6xl mx-auto px-6 py-8">
         {profileLoading && <LoadingState />}
         {!profileLoading && !profile?.has_data && (
-          <EmptyState notesCount={notes?.length ?? 0} />
+          <EmptyState notesCount={notes.length} />
         )}
         {!profileLoading && profile?.has_data && (
           <>

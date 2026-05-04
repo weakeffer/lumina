@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useTheme } from '../../../shared/context/ThemeContext';
+import { API_URL } from '../../../shared/config';
 import {
   Brain, TrendingUp, Tag, ChevronRight, ChevronDown,
   Loader, RefreshCw, BarChart2, Zap, Eye, EyeOff
@@ -42,7 +43,7 @@ function useNoteAnalysis(noteId) {
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(
-        `http://localhost:8000/api/notes/${noteId}/analysis/`,
+        `${API_URL}/api/notes/${noteId}/analysis/`,
         { headers: { Authorization: `Token ${token}` } }
       );
       const json = await res.json();
@@ -67,7 +68,7 @@ function useNoteAnalysis(noteId) {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      await fetch(`http://localhost:8000/api/notes/${noteId}/analyze/`, {
+      await fetch(`${API_URL}/api/notes/${noteId}/analyze/`, {
         method: 'POST',
         headers: { Authorization: `Token ${token}` },
       });

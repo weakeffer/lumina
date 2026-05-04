@@ -10,6 +10,7 @@ from django.core.cache import cache
 from django.db import transaction
 from ..models import Notes, NoteAnalysis
 from .analyzer import analyze_text, generate_day_narrative
+from .profile_service import invalidate_daily_summary_cache, invalidate_profile_cache
 
 logger = logging.getLogger('lumina.nlp')
 
@@ -213,15 +214,27 @@ def _run_analysis_sync(note_id: int) -> tuple:
             analysis.keywords = result.keywords
             analysis.entities = result.entities
             analysis.topics = result.topics
+            # Словарь из NLP может считать слова по «очищенному» тексту; для статистики
+            # берём максимум с сырым текстом заметки (title+text), чтобы Insights/сводки не занижали объём.
+            raw_word_count = len(text.split())
+            cleaned_wc = int(result.text_stats.get("word_count") or 0)
             analysis.text_stats = {
                 **result.text_stats,
-                'analysis_time': round(analysis_time, 2),
-                'analysis_timestamp': timezone.now().isoformat()
+                "word_count": max(raw_word_count, cleaned_wc),
+                "word_count_raw_note": raw_word_count,
+                "analysis_time": round(analysis_time, 2),
+                "analysis_timestamp": timezone.now().isoformat(),
             }
             analysis.narrative = result.narrative
             analysis.is_analyzed = True
             analysis.save()
-            
+
+            try:
+                invalidate_profile_cache(note.user_id)
+                invalidate_daily_summary_cache(note.user_id, note.created_at)
+            except Exception:
+                logger.debug("Не удалось сбросить кэш профиля/сводки дня", exc_info=True)
+
             return (note_id, True, None)
     
     except Exception as e:

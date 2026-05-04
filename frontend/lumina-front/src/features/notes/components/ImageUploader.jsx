@@ -13,12 +13,7 @@ const ImageUploader = ({ onImageUpload, onClose, noteId = null }) => {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
-  const getFullImageUrl = (url) => {
-    if (!url) return null;
-    if (url.startsWith('http')) return url;
-    if (url.startsWith('/')) return `http://localhost:8000${url}`;
-    return `http://localhost:8000/media/${url}`;
-  };
+  const getFullImageUrl = (url) => api.getImageUrl(url);
 
   const onDrop = useCallback(async (acceptedFiles) => {
     const file = acceptedFiles[0];

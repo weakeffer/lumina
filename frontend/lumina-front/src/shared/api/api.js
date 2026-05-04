@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:8000';
+import { API_URL, resolveMediaUrl } from '../config';
 
 export const api = {
     async register(userData) {
@@ -908,14 +908,7 @@ export const api = {
     },
 
     getImageUrl(imageUrl) {
-        if (!imageUrl) return null;
-        if (imageUrl.startsWith('http')) {
-            return imageUrl;
-        }
-        if (imageUrl.startsWith('/')) {
-            return `${API_URL}${imageUrl}`;
-        }
-        return `${API_URL}/media/${imageUrl}`;
+        return resolveMediaUrl(imageUrl);
     },
         // === NLP Analysis ===
 

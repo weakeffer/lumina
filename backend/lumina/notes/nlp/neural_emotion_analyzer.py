@@ -18,6 +18,11 @@ import logging
 
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import numpy as np
+from .multilingual_analyzer import (
+    EnglishEmotionAnalyzer,
+    detect_emotions_multilingual,
+    detect_language,
+)
 
 MODELS_DIR = os.path.join(settings.BASE_DIR, 'nlp_models')
 logger = logging.getLogger('lumina.nlp')
@@ -381,6 +386,7 @@ class LexiconEmotionAnalyzer:
 # ============================================================
 
 _neural_analyzer = None
+_english_analyzer = None
 _lexicon_analyzer = LexiconEmotionAnalyzer()
 _use_neural = True
 
@@ -405,19 +411,32 @@ def get_emotion_analyzer():
     return _lexicon_analyzer
 
 
+def get_english_emotion_analyzer():
+    """Возвращает английский анализатор (или None при ошибке)."""
+    global _english_analyzer
+    if _english_analyzer is None:
+        try:
+            _english_analyzer = EnglishEmotionAnalyzer()
+        except Exception as e:
+            logger.warning(f"[EmotionAnalyzer] Английская модель недоступна: {e}")
+            _english_analyzer = None
+    return _english_analyzer
+
+
 def detect_emotions_neural(text: str) -> Dict[str, float]:
     """
     Определяет эмоции с помощью нейросети.
     Возвращает словарь эмоция -> вероятность.
     """
     analyzer = get_emotion_analyzer()
-    
+
     if isinstance(analyzer, NeuralEmotionAnalyzer):
-        # Для нейросети возвращаем русские названия
-        return analyzer.get_scores_ru(text)
-    else:
-        # Для лексикона уже русские
-        return analyzer.predict(text)
+        en_analyzer = get_english_emotion_analyzer()
+        _, scores = detect_emotions_multilingual(text, analyzer, en_analyzer)
+        return scores
+
+    # Фаллбек на старый лексикон (русский)
+    return analyzer.predict(text)
 
 
 def get_dominant_emotion_neural(text: str) -> Tuple[str, float, str]:
@@ -425,18 +444,39 @@ def get_dominant_emotion_neural(text: str) -> Tuple[str, float, str]:
     Возвращает (название_эмоции, score, emoji)
     """
     analyzer = get_emotion_analyzer()
-    
+
     if isinstance(analyzer, NeuralEmotionAnalyzer):
+        lang = detect_language(text)
+        if lang == "en":
+            scores = detect_emotions_neural(text)
+            if not scores:
+                return "neutral", 1.0, "😐"
+            dominant_emotion, score = max(scores.items(), key=lambda x: x[1])
+            emoji_map = {
+                "happiness": "😊",
+                "love": "❤️",
+                "sadness": "😔",
+                "anger": "😠",
+                "fear": "😨",
+                "surprise": "😲",
+                "neutral": "😐",
+                "disgust": "🤢",
+                "confusion": "🤔",
+                "desire": "💭",
+                "guilt": "😟",
+                "sarcasm": "🙃",
+                "shame": "😳",
+            }
+            return dominant_emotion, score, emoji_map.get(dominant_emotion, "😐")
         return analyzer.get_dominant_emotion_ru(text)
-    else:
-        emotion, score = analyzer.get_dominant_emotion(text)
-        # Простой маппинг эмодзи для лексикона
-        emoji_map = {
-            'радость': '😊', 'грусть': '😔', 'злость': '😠', 'страх': '😨',
-            'удивление': '😲', 'усталость': '😴', 'интерес': '🤔', 'спокойствие': '😐',
-            'нейтрально': '😐'
-        }
-        return emotion, score, emoji_map.get(emotion, '😐')
+
+    emotion, score = analyzer.get_dominant_emotion(text)
+    emoji_map = {
+        'радость': '😊', 'грусть': '😔', 'злость': '😠', 'страх': '😨',
+        'удивление': '😲', 'усталость': '😴', 'интерес': '🤔', 'спокойствие': '😐',
+        'нейтрально': '😐'
+    }
+    return emotion, score, emoji_map.get(emotion, '😐')
 
 
 # Для обратной совместимости с analyzer.py
@@ -448,6 +488,7 @@ def map_neural_to_legacy_emotions(neural_scores: Dict[str, float]) -> Dict[str, 
     
     # Маппинг правил (можно расширять)
     mapping = {
+        # Русские метки
         'радость': 'joy',
         'счастье': 'joy',
         'энтузиазм': 'joy',
@@ -465,7 +506,21 @@ def map_neural_to_legacy_emotions(neural_scores: Dict[str, float]) -> Dict[str, 
         'гордость': 'pride',
         'благодарность': 'gratitude',
         'спокойствие': 'neutral',
-        'нейтрально': 'neutral'
+        'нейтрально': 'neutral',
+        # Английские метки (boltuix/emotions-dataset)
+        'happiness': 'joy',
+        'love': 'gratitude',
+        'sadness': 'sadness',
+        'anger': 'anger',
+        'fear': 'fear',
+        'surprise': 'surprise',
+        'neutral': 'neutral',
+        'desire': 'interest',
+        'confusion': 'interest',
+        'disgust': 'anger',
+        'guilt': 'sadness',
+        'shame': 'sadness',
+        'sarcasm': 'anger',
     }
     
     for neural_emotion, score in neural_scores.items():
@@ -484,3 +539,34 @@ def map_neural_to_legacy_emotions(neural_scores: Dict[str, float]) -> Dict[str, 
         legacy['neutral'] = 1.0
     
     return legacy
+
+
+def get_emotion_debug_info(text: str) -> Dict[str, object]:
+    """
+    Отладочная информация по маршрутизации эмоций.
+    Нужна для быстрого понимания, какая модель реально используется.
+    """
+    lang = detect_language(text)
+    analyzer = get_emotion_analyzer()
+    analyzer_type = type(analyzer).__name__
+
+    english_model_path = os.path.join(MODELS_DIR, "english-emotions-boltuix")
+    english_model_path_exists = os.path.exists(english_model_path)
+
+    english_loaded = False
+    english_error = None
+    if lang == "en":
+        try:
+            en_analyzer = get_english_emotion_analyzer()
+            english_loaded = bool(en_analyzer and en_analyzer.model is not None)
+        except Exception as e:
+            english_error = str(e)[:200]
+
+    return {
+        "detected_language": lang,
+        "main_analyzer_type": analyzer_type,
+        "english_model_path": english_model_path,
+        "english_model_path_exists": english_model_path_exists,
+        "english_model_loaded": english_loaded,
+        "english_model_error": english_error,
+    }

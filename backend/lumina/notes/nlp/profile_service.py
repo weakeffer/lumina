@@ -185,6 +185,20 @@ def invalidate_profile_cache(user_id: int):
     cache.delete(cache_key)
 
 
+def invalidate_daily_summary_cache(user_id: int, note_created_at) -> None:
+    """
+    Сбрасывает кэш сводки дня для даты создания заметки (локальная TZ Django).
+    Иначе после NLP на фронте остаются старые total_words / notes_count.
+    """
+    if not user_id or not note_created_at:
+        return
+    try:
+        local_date = timezone.localtime(note_created_at).date().isoformat()
+        cache.delete(f"daily_summary_{user_id}_{local_date}")
+    except Exception:
+        pass
+
+
 # ── Вспомогательные функции ───────────────────────────────────────────────
 
 def _sentiment_to_score(sentiment: str, score: float) -> float:

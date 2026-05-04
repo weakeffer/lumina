@@ -31,7 +31,11 @@ import logging
 
 from django.conf import settings
 from .neural_emotion_analyzer import detect_emotions_neural, map_neural_to_legacy_emotions
-from .neural_emotion_analyzer import get_emotion_analyzer, NeuralEmotionAnalyzer
+from .neural_emotion_analyzer import (
+    get_emotion_analyzer,
+    NeuralEmotionAnalyzer,
+    get_emotion_debug_info,
+)
 
 MODELS_DIR = os.path.join(settings.BASE_DIR, 'nlp_models')
 
@@ -396,30 +400,26 @@ def _analyze_segment_sentiment(text: str) -> Tuple[str, float]:
     try:
         analyzer = get_emotion_analyzer()
         if isinstance(analyzer, NeuralEmotionAnalyzer):
-            scores = analyzer.get_scores_ru(text)
-            
-            # Считаем позитивный и негативный суммарный скор
-            positive_emotions = {'радость', 'энтузиазм', 'гордость', 'благодарность'}
-            negative_emotions = {'грусть', 'гнев', 'страх', 'отвращение', 'раздражение'}
-            
-            pos_score = sum(scores.get(e, 0) for e in positive_emotions)
-            neg_score = sum(scores.get(e, 0) for e in negative_emotions)
-            
-            # Добавляем лексиконный анализ для усиления
+            raw_scores = detect_emotions_neural(text)
+            scores = map_neural_to_legacy_emotions(raw_scores)
+
+            pos_score = sum(scores.get(e, 0) for e in {"joy", "pride", "gratitude", "interest"})
+            neg_score = sum(scores.get(e, 0) for e in {"sadness", "anger", "fear", "fatigue"})
+
+            # Добавляем лексиконный анализ для усиления русских формулировок.
             lexicon_boost = _lexicon_sentiment_boost(text)
-            pos_score += lexicon_boost.get('positive', 0)
-            neg_score += lexicon_boost.get('negative', 0)
-            
+            pos_score += lexicon_boost.get("positive", 0)
+            neg_score += lexicon_boost.get("negative", 0)
+
             total = pos_score + neg_score
             if total < 0.1:
-                return 'neutral', 0.5
-            
+                return "neutral", 0.5
+
             if pos_score > neg_score * 1.3:
-                return 'positive', min(1.0, pos_score / max(total, 0.01))
-            elif neg_score > pos_score * 1.3:
-                return 'negative', min(1.0, neg_score / max(total, 0.01))
-            else:
-                return 'neutral', 0.5
+                return "positive", min(1.0, pos_score / max(total, 0.01))
+            if neg_score > pos_score * 1.3:
+                return "negative", min(1.0, neg_score / max(total, 0.01))
+            return "neutral", 0.5
     except Exception as e:
         print(f"[NLP] Ошибка нейросетевого анализа сегмента: {e}")
     
@@ -696,6 +696,12 @@ def analyze_text(text: str) -> AnalysisResult:
     try:
         words = clean.split()
         sentences_list = [s.strip() for s in re.split(r'[.!?]+', clean) if s.strip()]
+        debug_info = {}
+        try:
+            debug_info = get_emotion_debug_info(clean)
+        except Exception:
+            debug_info = {}
+
         result.text_stats = {
             'word_count': len(words),
             'char_count': len(clean),
@@ -704,6 +710,7 @@ def analyze_text(text: str) -> AnalysisResult:
             'segments_count': len(segments),
             'has_contrast': result.has_contrast,
             'models_available': models_available,
+            'emotion_debug': debug_info,
         }
     except Exception as e:
         print(f"[NLP] Ошибка статистики: {e}")

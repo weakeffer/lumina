@@ -1,4 +1,6 @@
 import React, { useRef } from 'react';
+import { resolveMediaUrl } from '../../../shared/config';
+import { MetricTile } from '../../../shared/components/stats';
 import { 
   User, Mail, Calendar, Clock, FileText, BookOpen, Star,
   Edit2, Camera, Send, Github, Globe, LogOut, Zap
@@ -14,7 +16,6 @@ const ProfileSidebar = ({
   themeClasses,
   level,
   getInitials,
-  formatDate,
   isOwnProfile = true
 }) => {
   const fileInputRef = useRef(null);
@@ -55,7 +56,7 @@ const ProfileSidebar = ({
                   ring-4 ring-offset-2 ring-indigo-500/20`}>
                   {user?.avatar_url ? (
                     <img 
-                      src={`http://localhost:8000${user.avatar_url}`} 
+                      src={resolveMediaUrl(user.avatar_url) ?? undefined} 
                       alt={user.username}
                       className="w-full h-full object-cover"
                     />
@@ -110,27 +111,24 @@ const ProfileSidebar = ({
 
             {/* Быстрая статистика */}
             <div className="grid grid-cols-3 gap-3 mb-6">
-              <div className={`p-3 rounded-xl ${themeClasses.colors.bg.secondary} text-center`}>
-                <FileText className={`w-5 h-5 mx-auto mb-1 ${themeClasses.colors.text.tertiary}`} />
-                <p className={`text-xl font-bold ${themeClasses.colors.text.primary}`}>
-                  {user?.total_notes || 0}
-                </p>
-                <p className={`text-xs ${themeClasses.colors.text.tertiary}`}>Заметок</p>
-              </div>
-              <div className={`p-3 rounded-xl ${themeClasses.colors.bg.secondary} text-center`}>
-                <BookOpen className={`w-5 h-5 mx-auto mb-1 ${themeClasses.colors.text.tertiary}`} />
-                <p className={`text-xl font-bold ${themeClasses.colors.text.primary}`}>
-                  {user?.total_words || 0}
-                </p>
-                <p className={`text-xs ${themeClasses.colors.text.tertiary}`}>Слов</p>
-              </div>
-              <div className={`p-3 rounded-xl ${themeClasses.colors.bg.secondary} text-center`}>
-                <Star className={`w-5 h-5 mx-auto mb-1 ${themeClasses.colors.text.tertiary}`} />
-                <p className={`text-xl font-bold ${themeClasses.colors.text.primary}`}>
-                  {user?.total_notes ? Math.round(user.total_words / user.total_notes) : 0}
-                </p>
-                <p className={`text-xs ${themeClasses.colors.text.tertiary}`}>Ср. слов</p>
-              </div>
+              <MetricTile
+                icon={FileText}
+                value={user?.total_notes || 0}
+                label="Заметок"
+                themeClasses={themeClasses}
+              />
+              <MetricTile
+                icon={BookOpen}
+                value={user?.total_words || 0}
+                label="Слов"
+                themeClasses={themeClasses}
+              />
+              <MetricTile
+                icon={Star}
+                value={user?.total_notes ? Math.round(user.total_words / user.total_notes) : 0}
+                label="Ср. слов"
+                themeClasses={themeClasses}
+              />
             </div>
 
             {/* Контактная информация */}

@@ -32,9 +32,13 @@ def _should_throttle_analysis(note_id: int) -> bool:
     return False
 
 
-def _safe_launch_analysis(note_id: int):
-    """Безопасный запуск NLP-анализа с проверками"""
-    if _should_throttle_analysis(note_id):
+def _safe_launch_analysis(note_id: int, *, force: bool = False):
+    """
+    Безопасный запуск NLP-анализа с проверками.
+    force=True — пропускает throttle (нужно при обновлении title/text,
+    иначе быстрые автосейвы блокируют повторный анализ на 5 секунд).
+    """
+    if not force and _should_throttle_analysis(note_id):
         return
 
     try:
@@ -94,8 +98,14 @@ def handle_note_save(sender, instance, created, **kwargs):
     _update_user_statistics(instance.user_id)
 
     if should_analyze:
-        # Отложенный запуск после коммита транзакции
-        transaction.on_commit(lambda: _safe_launch_analysis(instance.id))
+        # После изменения текста нужно переанализировать: сбрасываем флаг,
+        # иначе _run_analysis_sync пропустит заметку как «уже проанализированную».
+        def _enqueue_analysis():
+            from .models import NoteAnalysis
+            NoteAnalysis.objects.filter(note_id=instance.id).update(is_analyzed=False)
+            _safe_launch_analysis(instance.id, force=True)
+
+        transaction.on_commit(_enqueue_analysis)
 
 @receiver(post_delete, sender=Notes)
 def handle_note_delete(sender, instance, **kwargs):

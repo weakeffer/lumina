@@ -315,7 +315,6 @@ const ProfilePage = () => {
         themeClasses={themeClasses}
         level={level}
         getInitials={() => getInitials(user)}
-        formatDate={formatNoteDate}
         isOwnProfile={isOwnProfile}
       />
 

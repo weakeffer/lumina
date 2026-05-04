@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { API_URL } from '../../shared/config';
 import { Activity, TrendingUp, TrendingDown, Minus, Loader } from 'lucide-react';
 import Chart from 'chart.js/auto';
 
@@ -166,7 +167,7 @@ export default function TraitsTimeline({ isDark, themeClasses }) {
     queryKey: ['traits-timeline'],
     queryFn: async () => {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:8000/api/notes/traits-timeline/', {
+      const res = await fetch(`${API_URL}/api/notes/traits-timeline/`, {
         headers: { Authorization: `Token ${token}` },
       });
       return res.json();

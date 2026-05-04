@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { API_URL } from '../../../shared/config';
  
 const POLL_MS = 4000;
 const MAX_ATTEMPTS = 15; // ~60 сек максимум
@@ -33,7 +34,7 @@ export function useAnalysisToast(noteId, onReady) {
       try {
         const token = localStorage.getItem('token');
         const res = await fetch(
-          `http://localhost:8000/api/notes/${noteId}/analysis/`,
+          `${API_URL}/api/notes/${noteId}/analysis/`,
           { headers: { Authorization: `Token ${token}` } }
         );
         const json = await res.json();
